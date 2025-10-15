@@ -1,0 +1,29 @@
+{
+  "name": "ai-coach-server",
+  "version": "1.0.0",
+  "description": "AI编程教练后端服务（使用SQLite）",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon index.js",
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.12.2",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.19.1",
+    "node-cache": "^5.1.2",
+    "openai": "^4.20.1",
+    "rss-parser": "^3.13.0",
+    "sqlite3": "^5.1.6",
+    "xml2js": "^0.6.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

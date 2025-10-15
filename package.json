@@ -1,0 +1,20 @@
+{
+  "name": "ai-programming-coach",
+  "version": "1.0.0",
+  "description": "AI编程教练系统 - 支持题库难度选择、升级模式和大模型批注",
+  "main": "server/index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd server && npm run dev",
+    "client": "cd client && npm run dev",
+    "build": "cd client && npm run build",
+    "start": "cd server && npm start"
+  },
+  "keywords": ["ai", "programming", "coach", "education", "coding"],
+  "author": "AI Teacher",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
+
