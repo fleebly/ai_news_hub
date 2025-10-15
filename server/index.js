@@ -12,6 +12,7 @@ const aiRoutes = require('./routes/ai');
 const newsRoutes = require('./routes/news');
 const papersRoutes = require('./routes/papers');
 const blogsRoutes = require('./routes/blogs');
+const wechatRoutes = require('./routes/wechat');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -45,6 +46,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api', newsRoutes);
 app.use('/api', papersRoutes);
 app.use('/api', blogsRoutes);
+app.use('/api', wechatRoutes);
 
 // 健康检查
 app.get('/api/health', (req, res) => {

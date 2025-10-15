@@ -12,6 +12,7 @@ import TestQuestion from './pages/TestQuestion'
 import NewsDetail from './pages/NewsDetail'
 import Papers from './pages/Papers'
 import Blogs from './pages/Blogs'
+import Wechat from './pages/Wechat'
 import OpenSource from './pages/OpenSource'
 import Profile from './pages/Profile'
 import Leaderboard from './pages/Leaderboard'
@@ -65,6 +66,10 @@ function App() {
           <Route 
             path="/blogs" 
             element={<Blogs />} 
+          />
+          <Route 
+            path="/wechat" 
+            element={<Wechat />} 
           />
           <Route 
             path="/opensource" 
