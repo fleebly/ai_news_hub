@@ -80,11 +80,11 @@ function generateMockWechatArticles() {
   const now = Date.now();
   
   AI_WECHAT_ACCOUNTS.forEach((account, accountIndex) => {
-    // 为每个公众号生成3-5篇文章
-    const articleCount = 3 + Math.floor(Math.random() * 3);
+    // 为每个公众号生成5-8篇文章
+    const articleCount = 5 + Math.floor(Math.random() * 4);
     
     for (let i = 0; i < articleCount; i++) {
-      const dayOffset = accountIndex * 3 + i;
+      const dayOffset = accountIndex * 5 + i;
       const publishedAt = new Date(now - dayOffset * 24 * 60 * 60 * 1000);
       
       const titles = {

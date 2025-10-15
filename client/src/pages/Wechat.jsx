@@ -52,16 +52,21 @@ const Wechat = () => {
       const response = await fetch('http://localhost:5000/api/wechat/articles?limit=100')
       
       if (!response.ok) {
-        throw new Error('Failed to fetch articles')
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
       }
       
       const data = await response.json()
       
       if (data.success && data.articles) {
         setArticles(data.articles)
+        console.log(`✅ 成功加载 ${data.articles.length} 篇微信文章`)
+      } else {
+        console.error('❌ API返回数据格式错误:', data)
       }
     } catch (error) {
-      console.error('获取文章失败:', error)
+      console.error('❌ 获取文章失败:', error)
+      // 显示友好的错误提示
+      alert(`加载文章失败: ${error.message}`)
     } finally {
       setLoading(false)
     }
