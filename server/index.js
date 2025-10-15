@@ -13,6 +13,7 @@ const newsRoutes = require('./routes/news');
 const papersRoutes = require('./routes/papers');
 const blogsRoutes = require('./routes/blogs');
 const wechatRoutes = require('./routes/wechat');
+const aiPublishRoutes = require('./routes/aiPublishRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -47,6 +48,7 @@ app.use('/api', newsRoutes);
 app.use('/api', papersRoutes);
 app.use('/api', blogsRoutes);
 app.use('/api', wechatRoutes);
+app.use('/api/ai-publish', aiPublishRoutes);
 
 // 健康检查
 app.get('/api/health', (req, res) => {
