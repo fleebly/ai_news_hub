@@ -186,6 +186,24 @@ const Wechat = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Demo Notice Banner */}
+        <div className="mb-6 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg px-6 py-4 shadow-sm">
+          <div className="flex items-start space-x-3">
+            <div className="flex-shrink-0">
+              <div className="w-6 h-6 rounded-full bg-yellow-500 flex items-center justify-center text-white text-xs font-bold">
+                ℹ️
+              </div>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">💡 演示版本说明</h3>
+              <p className="text-xs text-gray-700 leading-relaxed">
+                当前展示的是<span className="font-semibold text-orange-600">模拟演示数据</span>，用于展示系统功能和界面。
+                文章内容、阅读量、点赞数等均为示例数据。如需查看真实公众号文章，请在微信中搜索对应公众号。
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Filters */}
         <div className="bg-white rounded-lg shadow-sm border mb-8">
           <div className="p-6">

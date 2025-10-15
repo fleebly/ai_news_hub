@@ -215,22 +215,24 @@ const WechatDetail = () => {
           </div>
 
           {/* Article Footer */}
-          <div className="px-8 py-6 bg-gray-50 border-t border-gray-100">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-600">
-                <p>本文来自微信公众号「{article.account}」</p>
-                <p className="text-xs text-gray-500 mt-1">仅用于技术交流学习</p>
+          <div className="px-8 py-6 bg-gradient-to-r from-blue-50 to-green-50 border-t border-gray-100">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-2">
+                  <MessageCircle className="h-5 w-5 text-green-600" />
+                  <p className="text-sm font-semibold text-gray-900">本文来自微信公众号「{article.account}」</p>
+                </div>
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3">
+                  <p className="text-xs text-yellow-800 flex items-center">
+                    <span className="inline-block w-2 h-2 bg-yellow-400 rounded-full mr-2"></span>
+                    <span className="font-medium">演示说明：</span>
+                    <span className="ml-1">当前为模拟数据演示，如需查看真实文章，请访问对应微信公众号</span>
+                  </p>
+                  <p className="text-xs text-gray-600 mt-1 ml-4">
+                    公众号ID: <span className="font-mono bg-white px-2 py-0.5 rounded">{article.accountId}</span>
+                  </p>
+                </div>
               </div>
-              
-              <a
-                href={article.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-lg hover:shadow-xl"
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                查看原文
-              </a>
             </div>
           </div>
         </article>
