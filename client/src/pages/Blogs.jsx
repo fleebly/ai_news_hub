@@ -107,16 +107,7 @@ const Blogs = () => {
 
   // 过滤文章
   const filteredArticles = useMemo(() => {
-    console.log('🔍 筛选条件:', { 
-      searchTerm, 
-      selectedCategory, 
-      selectedAuthor, 
-      selectedCompany, 
-      selectedTopic,
-      totalArticles: articles.length 
-    })
-    
-    const filtered = articles.filter(article => {
+    return articles.filter(article => {
       // 安全的搜索匹配（检查字段是否存在）
       const matchesSearch = searchTerm === '' ||
         (article.title && article.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -138,9 +129,6 @@ const Blogs = () => {
 
       return matchesSearch && matchesCategory && matchesAuthor && matchesCompany && matchesTopic
     })
-    
-    console.log('✅ 筛选结果:', filtered.length, '篇文章')
-    return filtered
   }, [articles, searchTerm, selectedCategory, selectedAuthor, selectedCompany, selectedTopic])
 
   const getCategoryColor = (category) => {
@@ -379,7 +367,6 @@ const Blogs = () => {
 
         {/* Articles Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6" key={`grid-${filteredArticles.length}`}>
-          {filteredArticles.length > 0 && console.log('📋 正在渲染文章数:', filteredArticles.length)}
           {filteredArticles.map((article) => (
             <div key={article.id} className="bg-white rounded-lg shadow-sm border hover:shadow-lg transition-all overflow-hidden group">
               {/* Article Image */}
