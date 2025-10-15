@@ -13,6 +13,7 @@ import NewsDetail from './pages/NewsDetail'
 import Papers from './pages/Papers'
 import Blogs from './pages/Blogs'
 import Wechat from './pages/Wechat'
+import WechatDetail from './pages/WechatDetail'
 import OpenSource from './pages/OpenSource'
 import Profile from './pages/Profile'
 import Leaderboard from './pages/Leaderboard'
@@ -70,6 +71,10 @@ function App() {
           <Route 
             path="/wechat" 
             element={<Wechat />} 
+          />
+          <Route 
+            path="/wechat/:id" 
+            element={<WechatDetail />} 
           />
           <Route 
             path="/opensource" 

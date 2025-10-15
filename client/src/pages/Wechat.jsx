@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { Link } from 'react-router-dom'
 import { 
   MessageCircle,
   Search,
@@ -325,9 +326,11 @@ const Wechat = () => {
                 </div>
 
                 {/* Title */}
-                <h3 className="text-lg font-bold text-gray-900 mb-3 line-clamp-2 hover:text-green-600 cursor-pointer leading-tight">
-                  {article.title}
-                </h3>
+                <Link to={`/wechat/${article.id}`}>
+                  <h3 className="text-lg font-bold text-gray-900 mb-3 line-clamp-2 hover:text-green-600 cursor-pointer leading-tight">
+                    {article.title}
+                  </h3>
+                </Link>
 
                 {/* Summary */}
                 <p className="text-gray-600 text-sm mb-4 line-clamp-3 leading-relaxed">
@@ -363,15 +366,13 @@ const Wechat = () => {
                     <span className="font-medium">{article.readTime}</span>
                   </div>
                   
-                  <a
-                    href={article.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <Link
+                    to={`/wechat/${article.id}`}
                     className="flex items-center space-x-1 text-green-600 hover:text-green-700 font-semibold text-sm group"
                   >
-                    <span>阅读</span>
+                    <span>阅读全文</span>
                     <ExternalLink className="h-4 w-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-                  </a>
+                  </Link>
                 </div>
               </div>
             </div>
