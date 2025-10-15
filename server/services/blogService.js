@@ -308,11 +308,16 @@ async function fetchBlogArticles(blog, maxArticles = 5) {
       return [];
     }
 
-    const articles = feed.items.slice(0, maxArticles).map(item => {
+    const articles = feed.items.slice(0, maxArticles).map((item, index) => {
       const publishedAt = new Date(item.pubDate || item.isoDate || Date.now());
       
+      // 生成唯一ID：使用完整的base64编码，不截断，确保100%唯一
+      const randomSuffix = Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+      const uniqueString = `${item.link || item.guid}_${blog.name}_idx${index}_${randomSuffix}`;
+      const id = Buffer.from(uniqueString).toString('base64').replace(/[^a-zA-Z0-9]/g, '');
+      
       return {
-        id: `blog_${Buffer.from(item.link || item.guid).toString('base64').slice(0, 20)}`,
+        id,
         title: cleanText(item.title),
         summary: extractSummary(item),
         content: extractContent(item),
