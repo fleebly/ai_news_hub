@@ -78,10 +78,23 @@ const Blogs = () => {
     const topicSet = new Set()
 
     articles.forEach(article => {
-      if (article.author) authorSet.add(article.author)
-      if (article.company) companySet.add(article.company)
-      if (article.topics) {
-        article.topics.forEach(topic => topicSet.add(topic))
+      // 添加作者
+      if (article.author && typeof article.author === 'string') {
+        authorSet.add(article.author)
+      }
+      
+      // 添加公司
+      if (article.company && typeof article.company === 'string') {
+        companySet.add(article.company)
+      }
+      
+      // 添加主题
+      if (article.topics && Array.isArray(article.topics)) {
+        article.topics.forEach(topic => {
+          if (topic && typeof topic === 'string') {
+            topicSet.add(topic)
+          }
+        })
       }
     })
 
@@ -95,16 +108,24 @@ const Blogs = () => {
   // 过滤文章
   const filteredArticles = useMemo(() => {
     return articles.filter(article => {
+      // 安全的搜索匹配（检查字段是否存在）
       const matchesSearch = searchTerm === '' ||
-        article.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        article.author.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        article.summary.toLowerCase().includes(searchTerm.toLowerCase())
+        (article.title && article.title.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (article.author && article.author.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (article.summary && article.summary.toLowerCase().includes(searchTerm.toLowerCase()))
       
+      // 分类筛选
       const matchesCategory = selectedCategory === 'all' || article.category === selectedCategory
+      
+      // 作者筛选
       const matchesAuthor = selectedAuthor === 'all' || article.author === selectedAuthor
+      
+      // 公司筛选
       const matchesCompany = selectedCompany === 'all' || article.company === selectedCompany
+      
+      // 主题筛选
       const matchesTopic = selectedTopic === 'all' || 
-        (article.topics && article.topics.includes(selectedTopic))
+        (article.topics && Array.isArray(article.topics) && article.topics.includes(selectedTopic))
 
       return matchesSearch && matchesCategory && matchesAuthor && matchesCompany && matchesTopic
     })
