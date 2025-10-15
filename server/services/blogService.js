@@ -316,9 +316,11 @@ async function fetchBlogArticles(blog, maxArticles = 5) {
       const uniqueString = `${item.link || item.guid}_${blog.name}_idx${index}_${randomSuffix}`;
       const id = Buffer.from(uniqueString).toString('base64').replace(/[^a-zA-Z0-9]/g, '');
       
+      const title = cleanText(item.title);
+      
       return {
         id,
-        title: cleanText(item.title),
+        title,
         summary: extractSummary(item),
         content: extractContent(item),
         author: blog.author,
@@ -329,8 +331,8 @@ async function fetchBlogArticles(blog, maxArticles = 5) {
         language: blog.language,
         publishedAt: publishedAt.toISOString(),
         link: item.link,
-        imageUrl: extractImage(item),
-        tags: extractBlogTags(item.title, item.content || item.contentSnippet, blog.category),
+        imageUrl: extractImage(item, title, blog.category),
+        tags: extractBlogTags(title, item.content || item.contentSnippet, blog.category),
         topics: blog.topics || [],
         readTime: calculateReadTime(item.content || item.contentSnippet),
         featured: blog.priority >= 9,
@@ -409,32 +411,56 @@ function extractContent(item) {
   return item['content:encoded'] || item.content || item.contentSnippet || extractSummary(item);
 }
 
-function extractImage(item) {
-  // 尝试多种方式提取图片
+function extractImage(item, title = '', category = '') {
+  // 1. 尝试从 RSS feed 的标准字段提取图片
   if (item['media:thumbnail']) {
-    return item['media:thumbnail'].$ ? item['media:thumbnail'].$.url : item['media:thumbnail'];
+    const url = item['media:thumbnail'].$ ? item['media:thumbnail'].$.url : item['media:thumbnail'];
+    if (url && typeof url === 'string') return url;
   }
+  
   if (item['media:content']) {
-    return item['media:content'].$ ? item['media:content'].$.url : item['media:content'];
+    const url = item['media:content'].$ ? item['media:content'].$.url : item['media:content'];
+    if (url && typeof url === 'string') return url;
   }
+  
   if (item.enclosure && item.enclosure.url) {
     return item.enclosure.url;
   }
   
-  // 从内容中提取第一张图片
-  const content = item.content || item['content:encoded'] || '';
-  const imgMatch = content.match(/<img[^>]+src="([^">]+)"/);
-  if (imgMatch) {
-    return imgMatch[1];
+  // 2. 从内容中提取第一张图片（改进正则，支持单引号和更多格式）
+  const content = item.content || item['content:encoded'] || item.description || '';
+  const imgPatterns = [
+    /<img[^>]+src=["']([^"']+)["']/i,
+    /<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i
+  ];
+  
+  for (const pattern of imgPatterns) {
+    const match = content.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
   }
   
-  // 默认图片
-  const defaultImages = [
-    'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=600&h=400&fit=crop',
-    'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=600&h=400&fit=crop',
-    'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=600&h=400&fit=crop'
+  // 3. 使用固定的高质量AI主题占位图（基于标题hash选择，确保稳定）
+  const hash = (title + category).split('').reduce((acc, char) => {
+    return char.charCodeAt(0) + ((acc << 5) - acc);
+  }, 0);
+  
+  const aiThemeImages = [
+    'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&h=600&fit=crop&q=80', // AI芯片
+    'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=800&h=600&fit=crop&q=80', // AI网络
+    'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800&h=600&fit=crop&q=80', // AI代码
+    'https://images.unsplash.com/photo-1655720828018-edd2daec9349?w=800&h=600&fit=crop&q=80', // AI大脑
+    'https://images.unsplash.com/photo-1676277791608-ac52a2f66b47?w=800&h=600&fit=crop&q=80', // AI机器人
+    'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=800&h=600&fit=crop&q=80', // AI数据
+    'https://images.unsplash.com/photo-1677756119517-756a188d2d94?w=800&h=600&fit=crop&q=80', // AI未来
+    'https://images.unsplash.com/photo-1686191128892-3b8e41692c5c?w=800&h=600&fit=crop&q=80', // AI深度学习
   ];
-  return defaultImages[Math.floor(Math.random() * defaultImages.length)];
+  
+  // 使用hash确保同一篇文章总是显示相同的占位图
+  const index = Math.abs(hash) % aiThemeImages.length;
+  return aiThemeImages[index];
 }
 
 function extractBlogTags(title, content, category) {

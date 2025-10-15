@@ -388,8 +388,26 @@ const Blogs = () => {
                   src={article.imageUrl}
                   alt={article.title}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  loading="lazy"
                   onError={(e) => {
-                    e.target.src = 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=600&h=400&fit=crop'
+                    // 防止无限循环，只处理一次
+                    if (!e.target.dataset.fallback) {
+                      e.target.dataset.fallback = 'true';
+                      // 使用基于文章ID的稳定fallback图片
+                      const hash = article.id.split('').reduce((acc, char) => 
+                        char.charCodeAt(0) + ((acc << 5) - acc), 0
+                      );
+                      const fallbackImages = [
+                        'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&h=600&fit=crop&q=80',
+                        'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=800&h=600&fit=crop&q=80',
+                        'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800&h=600&fit=crop&q=80',
+                        'https://images.unsplash.com/photo-1655720828018-edd2daec9349?w=800&h=600&fit=crop&q=80'
+                      ];
+                      e.target.src = fallbackImages[Math.abs(hash) % fallbackImages.length];
+                    } else {
+                      // 如果fallback也失败，隐藏图片显示渐变背景
+                      e.target.style.display = 'none';
+                    }
                   }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
