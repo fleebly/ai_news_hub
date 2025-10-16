@@ -47,7 +47,7 @@ class AliyunBailianService {
             'Authorization': `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json'
           },
-          timeout: 90000 // 90秒超时，给AI更多时间生成内容
+          timeout: 180000 // 180秒(3分钟)超时，深度解读需要更长时间
         }
       );
 

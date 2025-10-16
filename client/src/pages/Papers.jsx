@@ -883,7 +883,7 @@ const Papers = () => {
                 <div className="flex flex-col items-center justify-center py-12">
                   <Loader className="h-12 w-12 text-purple-600 animate-spin mb-4" />
                   <p className="text-gray-600 text-lg">AI正在解读论文...</p>
-                  <p className="text-gray-400 text-sm mt-2">这可能需要 30-60 秒</p>
+                  <p className="text-gray-400 text-sm mt-2">这可能需要 1-3 分钟，请耐心等待...</p>
                 </div>
               )}
 
