@@ -73,30 +73,38 @@ class AliyunBailianService {
   }
 
   /**
-   * 调用阿里云百炼多模态模型（支持PDF/图片）
+   * 调用阿里云百炼多模态模型（支持图片base64或URL）
    */
-  async chatWithVision(messages, pdfUrl, options = {}) {
+  async chatWithVision(messages, imageDataOrUrl, options = {}) {
     if (!this.enabled) {
       console.log('⚠️  多模态功能未启用，使用文本模式');
       return this.chat(messages, options);
     }
 
-    if (!pdfUrl) {
-      console.log('⚠️  无PDF URL，使用文本模式');
+    if (!imageDataOrUrl) {
+      console.log('⚠️  无图片数据，使用文本模式');
       return this.chat(messages, options);
     }
 
     try {
+      // 判断是base64还是URL
+      const isBase64 = imageDataOrUrl.startsWith('data:image/') || 
+                      (imageDataOrUrl.length > 1000 && !imageDataOrUrl.startsWith('http'));
+      
+      const imageData = isBase64 ? imageDataOrUrl : 
+                       (imageDataOrUrl.startsWith('data:image/') ? imageDataOrUrl : 
+                       `https://dashscope-result.oss-cn-beijing.aliyuncs.com/${imageDataOrUrl}`);
+
       // 构建多模态消息
       const multimodalMessages = messages.map((msg, index) => {
-        // 在最后一条用户消息中添加PDF
-        if (index === messages.length - 1 && msg.role === 'user' && pdfUrl) {
+        // 在最后一条用户消息中添加图片
+        if (index === messages.length - 1 && msg.role === 'user') {
           return {
             role: 'user',
             content: [
               {
-                type: 'file',
-                file: pdfUrl  // PDF URL
+                type: 'image',
+                image: imageData  // 支持base64或URL
               },
               {
                 type: 'text',
@@ -108,7 +116,7 @@ class AliyunBailianService {
         return msg;
       });
 
-      console.log('🔍 使用多模态模型分析PDF:', pdfUrl);
+      console.log('🔍 使用多模态模型分析图片');
 
       const response = await axios.post(
         `${this.endpoint}/services/aigc/multimodal-generation/generation`,
@@ -118,7 +126,7 @@ class AliyunBailianService {
             messages: multimodalMessages
           },
           parameters: {
-            max_tokens: options.maxTokens || 6000,
+            max_tokens: options.maxTokens || 2000,
             temperature: options.temperature || 0.7,
             top_p: options.topP || 0.8,
             result_format: 'message'
@@ -129,7 +137,7 @@ class AliyunBailianService {
             'Authorization': `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json'
           },
-          timeout: 300000 // 5分钟超时，PDF处理需要更长时间
+          timeout: 120000 // 2分钟超时
         }
       );
 
@@ -146,9 +154,7 @@ class AliyunBailianService {
         console.error('响应数据:', JSON.stringify(error.response.data));
       }
       
-      // 降级到文本模式
-      console.log('⚠️  多模态模式失败，降级到文本模式');
-      return this.chat(messages, options);
+      throw error; // 不降级，让调用方处理
     }
   }
 
