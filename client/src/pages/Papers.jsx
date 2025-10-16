@@ -877,7 +877,10 @@ const Papers = () => {
                       {isFavorite(paper.id) ? '已收藏' : '收藏'}
                     </button>
                     <button
-                      onClick={() => openAnalysisModal(paper)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openAnalysisModal(paper)
+                      }}
                       className="flex items-center px-3 py-1 text-sm text-white bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 rounded-lg transition-colors shadow-sm hover:shadow-md"
                     >
                       <Sparkles className="h-4 w-4 mr-1" />
@@ -934,8 +937,23 @@ const Papers = () => {
 
       {/* AI解读模态框 */}
       {showAnalysisModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-7xl w-full max-h-[95vh] overflow-hidden flex flex-col">
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={(e) => {
+            // 点击背景关闭Modal
+            if (e.target === e.currentTarget) {
+              console.log('🚀 点击背景关闭Modal')
+              setShowAnalysisModal(false)
+            }
+          }}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl max-w-7xl w-full max-h-[95vh] overflow-hidden flex flex-col"
+            onClick={(e) => {
+              // 防止点击Modal内容时关闭
+              e.stopPropagation()
+            }}
+          >
             {/* Header */}
             <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6 flex items-center justify-between">
               <div className="flex items-center space-x-3">
