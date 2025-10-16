@@ -94,7 +94,6 @@ const Papers = () => {
   const [showAnalysisModal, setShowAnalysisModal] = useState(false)
   const [selectedPaper, setSelectedPaper] = useState(null)
   const [analysisMode] = useState('deep') // 只保留深度解读
-  const [analysisLevel, setAnalysisLevel] = useState('standard') // 混合模型级别
   const [analyzing, setAnalyzing] = useState(false)
   const [analysisResult, setAnalysisResult] = useState(null)
   const [analysisError, setAnalysisError] = useState('')
@@ -419,8 +418,7 @@ const Papers = () => {
     setAnalysisResult(null)
     
     // 检查是否有缓存的结果
-    const cacheKey = `${paper.id}_${analysisLevel}`
-    const cachedResult = getAnalysisFromCache(cacheKey, analysisMode)
+    const cachedResult = getAnalysisFromCache(paper.id, 'standard')
     if (cachedResult) {
       console.log('✅ 找到缓存的解读内容')
       setAnalysisResult(cachedResult)
@@ -1131,16 +1129,8 @@ const Papers = () => {
                     <div>
                       <p className="text-gray-900 text-xl font-bold">AI正在解读论文</p>
                       <div className="flex items-center space-x-2 text-sm mt-1">
-                        <span className="text-2xl">
-                          {analysisLevel === 'fast' && '⚡'}
-                          {analysisLevel === 'standard' && '🖼️'}
-                          {analysisLevel === 'deep' && '🔬'}
-                        </span>
-                        <span className="text-gray-600 font-medium">
-                          {analysisLevel === 'fast' && '快速模式'}
-                          {analysisLevel === 'standard' && '标准模式'}
-                          {analysisLevel === 'deep' && '完整模式'}
-                        </span>
+                        <span className="text-2xl">🖼️</span>
+                        <span className="text-gray-600 font-medium">标准模式 · 深度解读</span>
                       </div>
                     </div>
                   </div>
@@ -1192,11 +1182,7 @@ const Papers = () => {
 
                   {/* 预计时间 */}
                   <p className="text-gray-500 text-sm mt-4 text-center">
-                    ⏱️ 预计还需{' '}
-                    {analysisLevel === 'fast' && '1-3'}
-                    {analysisLevel === 'standard' && '2-4'}
-                    {analysisLevel === 'deep' && '3-5'}{' '}
-                    分钟，请耐心等待...
+                    ⏱️ 预计还需 2-4 分钟，请耐心等待...
                   </p>
                 </div>
               )}
