@@ -1,6 +1,7 @@
 const Parser = require('rss-parser');
 const NodeCache = require('node-cache');
 const axios = require('axios');
+const socialMediaService = require('./socialMediaService');
 
 // 创建缓存实例，缓存时间为30分钟，提升性能
 const cache = new NodeCache({ stdTTL: 1800 });
@@ -148,10 +149,10 @@ async function searchWithBrave(query) {
 }
 
 /**
- * 聚合所有来源的新闻
+ * 聚合所有来源的新闻（包括社交媒体）
  */
-async function aggregateNews() {
-  const cacheKey = 'all_news';
+async function aggregateNews(includeSocial = true) {
+  const cacheKey = includeSocial ? 'all_news_with_social' : 'all_news';
   const cached = cache.get(cacheKey);
   if (cached) {
     return cached;
@@ -159,20 +160,25 @@ async function aggregateNews() {
 
   try {
     // 并行获取多个来源
-    const [rssNews, braveNews] = await Promise.allSettled([
+    const promises = [
       fetchFromRSS(),
       searchWithBrave('AI artificial intelligence latest news OR GPT OR Claude OR machine learning')
-    ]);
+    ];
+
+    // 如果需要，添加社交媒体内容
+    if (includeSocial) {
+      promises.push(socialMediaService.aggregateAll());
+    }
+
+    const results = await Promise.allSettled(promises);
 
     const allNews = [];
     
-    if (rssNews.status === 'fulfilled') {
-      allNews.push(...rssNews.value);
-    }
-    
-    if (braveNews.status === 'fulfilled') {
-      allNews.push(...braveNews.value);
-    }
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        allNews.push(...result.value);
+      }
+    });
 
     // 去重（基于标题相似度）
     const uniqueNews = deduplicateNews(allNews);
@@ -180,8 +186,8 @@ async function aggregateNews() {
     // 按发布时间排序
     uniqueNews.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
     
-    // 取前30条
-    const topNews = uniqueNews.slice(0, 30);
+    // 取前50条（因为现在有更多来源）
+    const topNews = uniqueNews.slice(0, 50);
     
     cache.set(cacheKey, topNews);
     return topNews;
@@ -189,6 +195,16 @@ async function aggregateNews() {
     console.error('Error aggregating news:', error);
     return [];
   }
+}
+
+/**
+ * 获取社交媒体内容
+ */
+async function getSocialMediaContent(platform = null) {
+  if (platform) {
+    return await socialMediaService.getByPlatform(platform);
+  }
+  return await socialMediaService.aggregateAll();
 }
 
 /**
@@ -354,12 +370,14 @@ function calculateSimilarity(str1, str2) {
  */
 function clearCache() {
   cache.flushAll();
-  return { success: true, message: 'Cache cleared' };
+  socialMediaService.clearCache();
+  return { success: true, message: 'Cache cleared (including social media)' };
 }
 
 module.exports = {
   aggregateNews,
   getNewsById,
+  getSocialMediaContent,
   clearCache,
   fetchFromRSS,
   searchWithBrave

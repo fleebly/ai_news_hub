@@ -12,7 +12,11 @@ import {
   Brain,
   Sparkles,
   Eye,
-  Loader2
+  Loader2,
+  MessageCircle,
+  Share2,
+  ThumbsUp,
+  Filter
 } from 'lucide-react'
 import api from '../services/api'
 
@@ -26,16 +30,30 @@ const AINewsFeed = () => {
   const [lastUpdated, setLastUpdated] = useState(null)
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
+  const [platform, setPlatform] = useState('all')
+  const [showFilters, setShowFilters] = useState(false)
   const observer = useRef()
   const ITEMS_PER_PAGE = 10
+
+  const platforms = [
+    { value: 'all', label: '全部', icon: TrendingUp },
+    { value: 'reddit', label: 'Reddit', icon: MessageCircle },
+    { value: 'twitter', label: 'Twitter', icon: Share2 },
+    { value: 'weibo', label: '微博', icon: Users }
+  ]
 
   const fetchNews = async () => {
     try {
       setLoading(true)
       setError(null)
       
-      // 先尝试直接调用后端API
-      const response = await fetch('http://localhost:5000/api/ai-news')
+      // 构建API URL，根据选择的平台
+      let apiUrl = 'http://localhost:5000/api/ai-news'
+      if (platform && platform !== 'all') {
+        apiUrl += `?platform=${platform}`
+      }
+      
+      const response = await fetch(apiUrl)
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
@@ -156,7 +174,7 @@ const AINewsFeed = () => {
     // 更频繁的刷新 - 每2分钟刷新一次
     const interval = setInterval(fetchNews, 2 * 60 * 1000)
     return () => clearInterval(interval)
-  }, [])
+  }, [platform]) // 当平台改变时重新获取
 
   // 当新闻数据更新时，重置显示
   useEffect(() => {
@@ -304,10 +322,23 @@ const AINewsFeed = () => {
     )
   }
 
+  const getPlatformBadge = (itemPlatform) => {
+    switch (itemPlatform) {
+      case 'Reddit':
+        return { color: 'bg-orange-100 text-orange-800', icon: MessageCircle }
+      case 'Twitter':
+        return { color: 'bg-blue-100 text-blue-800', icon: Share2 }
+      case '微博':
+        return { color: 'bg-red-100 text-red-800', icon: Users }
+      default:
+        return null
+    }
+  }
+
   return (
     <div className="bg-white rounded-lg shadow-sm border">
       <div className="p-6 border-b border-gray-200 sticky top-0 bg-white z-10">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-2">
             <h2 className="text-xl font-bold text-gray-900 flex items-center">
               <TrendingUp className="h-5 w-5 mr-2 text-primary-600" />
@@ -325,6 +356,13 @@ const AINewsFeed = () => {
               </span>
             )}
             <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`p-2 rounded-lg transition-colors ${showFilters ? 'text-primary-600 bg-primary-50' : 'text-gray-500 hover:text-primary-600'}`}
+              title="过滤"
+            >
+              <Filter className="h-4 w-4" />
+            </button>
+            <button
               onClick={fetchNews}
               className="p-2 text-gray-500 hover:text-primary-600 transition-colors"
               title="刷新"
@@ -334,6 +372,32 @@ const AINewsFeed = () => {
             </button>
           </div>
         </div>
+
+        {/* 平台过滤器 */}
+        {showFilters && (
+          <div className="mt-4 pt-4 border-t">
+            <div className="flex items-center space-x-2 flex-wrap gap-2">
+              <span className="text-sm font-medium text-gray-700">平台:</span>
+              {platforms.map((p) => {
+                const Icon = p.icon
+                return (
+                  <button
+                    key={p.value}
+                    onClick={() => setPlatform(p.value)}
+                    className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                      platform === p.value
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    <Icon className="h-3 w-3 mr-1" />
+                    {p.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       <div>
@@ -359,11 +423,24 @@ const AINewsFeed = () => {
               </div>
               
               <div className="flex-1 min-w-0">
-                <div className="flex items-center space-x-2 mb-2">
+                <div className="flex items-center space-x-2 mb-2 flex-wrap">
                   <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(article.category)}`}>
                     {getCategoryIcon(article.category)}
                     <span className="ml-1">{article.category}</span>
                   </span>
+                  {article.platform && (() => {
+                    const badge = getPlatformBadge(article.platform)
+                    if (badge) {
+                      const PlatformIcon = badge.icon
+                      return (
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${badge.color}`}>
+                          <PlatformIcon className="h-3 w-3 mr-1" />
+                          {article.platform}
+                        </span>
+                      )
+                    }
+                    return null
+                  })()}
                   {article.trending && (
                     <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
                       <TrendingUp className="h-3 w-3 mr-1" />

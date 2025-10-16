@@ -18,7 +18,8 @@ import {
   RefreshCw,
   Sparkles,
   X,
-  Loader
+  Loader,
+  Heart
 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import api from '../services/api'
@@ -31,6 +32,10 @@ const Papers = () => {
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [selectedConference, setSelectedConference] = useState('all')
   const [showTrendingOnly, setShowTrendingOnly] = useState(false)
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
+  
+  // 收藏功能
+  const [favorites, setFavorites] = useState([])
   
   // AI解读相关状态
   const [showAnalysisModal, setShowAnalysisModal] = useState(false)
@@ -189,6 +194,19 @@ const Papers = () => {
     }
   ]
 
+  // 加载收藏列表
+  useEffect(() => {
+    const savedFavorites = localStorage.getItem('paper-favorites')
+    if (savedFavorites) {
+      try {
+        setFavorites(JSON.parse(savedFavorites))
+      } catch (e) {
+        console.error('加载收藏列表失败:', e)
+        setFavorites([])
+      }
+    }
+  }, [])
+
   useEffect(() => {
     fetchPapers()
   }, [])
@@ -235,14 +253,33 @@ const Papers = () => {
     }
   }
 
+  // 切换收藏
+  const toggleFavorite = (paperId) => {
+    setFavorites(prev => {
+      const newFavorites = prev.includes(paperId)
+        ? prev.filter(id => id !== paperId)
+        : [...prev, paperId]
+      
+      // 保存到localStorage
+      localStorage.setItem('paper-favorites', JSON.stringify(newFavorites))
+      return newFavorites
+    })
+  }
+
+  // 检查是否已收藏
+  const isFavorite = (paperId) => {
+    return favorites.includes(paperId)
+  }
+
   const filteredPapers = papers.filter(paper => {
     const matchesSearch = paper.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          paper.authors.some(author => author.toLowerCase().includes(searchTerm.toLowerCase()))
     const matchesCategory = selectedCategory === 'all' || paper.category === selectedCategory
     const matchesConference = selectedConference === 'all' || paper.conference.toLowerCase().includes(selectedConference.toLowerCase())
     const matchesTrending = !showTrendingOnly || paper.trending
+    const matchesFavorites = !showFavoritesOnly || isFavorite(paper.id)
 
-    return matchesSearch && matchesCategory && matchesConference && matchesTrending
+    return matchesSearch && matchesCategory && matchesConference && matchesTrending && matchesFavorites
   })
 
   const getConferenceColor = (conference) => {
@@ -269,12 +306,63 @@ const Papers = () => {
     }
   }
 
+  // 获取缓存的key
+  const getCacheKey = (paperId, mode) => {
+    return `paper-analysis-${paperId}-${mode}`
+  }
+
+  // 从缓存获取解读内容
+  const getAnalysisFromCache = (paperId, mode) => {
+    try {
+      const cacheKey = getCacheKey(paperId, mode)
+      const cached = localStorage.getItem(cacheKey)
+      if (cached) {
+        const data = JSON.parse(cached)
+        // 检查缓存是否过期（7天）
+        const cacheTime = new Date(data.cachedAt)
+        const now = new Date()
+        const diffDays = (now - cacheTime) / (1000 * 60 * 60 * 24)
+        if (diffDays < 7) {
+          return data.result
+        }
+      }
+    } catch (e) {
+      console.error('读取缓存失败:', e)
+    }
+    return null
+  }
+
+  // 保存解读内容到缓存
+  const saveAnalysisToCache = (paperId, mode, result) => {
+    try {
+      const cacheKey = getCacheKey(paperId, mode)
+      const data = {
+        result: result,
+        cachedAt: new Date().toISOString()
+      }
+      localStorage.setItem(cacheKey, JSON.stringify(data))
+    } catch (e) {
+      console.error('保存缓存失败:', e)
+    }
+  }
+
   // AI解读功能
   const handleAnalyze = async (paper) => {
     setSelectedPaper(paper)
     setShowAnalysisModal(true)
-    setAnalysisResult(null)
     setAnalysisError('')
+    
+    // 检查缓存
+    const cachedResult = getAnalysisFromCache(paper.id, analysisMode)
+    if (cachedResult) {
+      console.log('✅ 使用缓存的解读内容')
+      setAnalysisResult(cachedResult)
+      setAnalyzing(false)
+      return
+    }
+
+    // 没有缓存，发起请求
+    setAnalysisResult(null)
     setAnalyzing(true)
 
     try {
@@ -289,7 +377,10 @@ const Papers = () => {
       })
 
       if (response.data.success) {
-        setAnalysisResult(response.data.data)
+        const result = response.data.data
+        setAnalysisResult(result)
+        // 保存到缓存
+        saveAnalysisToCache(paper.id, analysisMode, result)
       } else {
         setAnalysisError(response.data.message || '解读失败')
       }
@@ -413,8 +504,8 @@ const Papers = () => {
               </select>
             </div>
             
-            {/* Trending Filter */}
-            <div className="flex items-center space-x-2">
+            {/* Filters */}
+            <div className="flex items-center space-x-6">
               <label className="flex items-center cursor-pointer">
                 <input
                   type="checkbox"
@@ -427,6 +518,20 @@ const Papers = () => {
                   只显示热门论文
                 </span>
               </label>
+              
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showFavoritesOnly}
+                  onChange={(e) => setShowFavoritesOnly(e.target.checked)}
+                  className="form-checkbox h-4 w-4 text-pink-600 rounded focus:ring-pink-500"
+                />
+                <span className="ml-2 text-sm text-gray-700 flex items-center">
+                  <Heart className="h-4 w-4 mr-1 text-pink-500 fill-current" />
+                  只显示收藏 ({favorites.length})
+                </span>
+              </label>
+              
               <span className="text-xs text-gray-500">
                 ({filteredPapers.length} 篇论文)
               </span>
@@ -510,6 +615,18 @@ const Papers = () => {
                   </div>
                   
                   <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => toggleFavorite(paper.id)}
+                      className={`flex items-center px-3 py-1 text-sm border rounded-lg transition-all ${
+                        isFavorite(paper.id)
+                          ? 'text-pink-600 border-pink-300 bg-pink-50 hover:bg-pink-100'
+                          : 'text-gray-600 border-gray-300 hover:text-pink-600 hover:border-pink-300 hover:bg-pink-50'
+                      }`}
+                      title={isFavorite(paper.id) ? '取消收藏' : '收藏论文'}
+                    >
+                      <Heart className={`h-4 w-4 mr-1 ${isFavorite(paper.id) ? 'fill-current' : ''}`} />
+                      {isFavorite(paper.id) ? '已收藏' : '收藏'}
+                    </button>
                     <button
                       onClick={() => handleAnalyze(paper)}
                       className="flex items-center px-3 py-1 text-sm text-white bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 rounded-lg transition-colors shadow-sm hover:shadow-md"
@@ -659,8 +776,63 @@ const Papers = () => {
                       下载
                     </button>
                   </div>
-                  <div className="prose prose-lg max-w-none">
-                    <ReactMarkdown>{analysisResult.content}</ReactMarkdown>
+                  <div className="prose prose-lg max-w-none 
+                    prose-headings:font-bold prose-headings:text-gray-900 
+                    prose-h1:text-3xl prose-h1:mb-4 prose-h1:mt-8 prose-h1:pb-3 prose-h1:border-b-2 prose-h1:border-purple-500
+                    prose-h2:text-2xl prose-h2:mb-3 prose-h2:mt-6 prose-h2:text-purple-700
+                    prose-h3:text-xl prose-h3:mb-2 prose-h3:mt-4 prose-h3:text-purple-600
+                    prose-p:text-gray-700 prose-p:leading-relaxed prose-p:mb-4 prose-p:text-base
+                    prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
+                    prose-strong:text-gray-900 prose-strong:font-semibold
+                    prose-code:text-pink-600 prose-code:bg-pink-50 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded
+                    prose-pre:bg-gray-900 prose-pre:text-gray-100 prose-pre:p-4 prose-pre:rounded-lg prose-pre:overflow-x-auto
+                    prose-blockquote:border-l-4 prose-blockquote:border-purple-500 prose-blockquote:bg-purple-50 prose-blockquote:py-2 prose-blockquote:px-4 prose-blockquote:italic
+                    prose-ul:list-disc prose-ul:ml-6 prose-ul:mb-4
+                    prose-ol:list-decimal prose-ol:ml-6 prose-ol:mb-4
+                    prose-li:text-gray-700 prose-li:mb-2
+                    prose-img:rounded-lg prose-img:shadow-lg prose-img:my-6 prose-img:mx-auto prose-img:w-full
+                    prose-table:border-collapse prose-table:w-full prose-table:my-6
+                    prose-th:bg-purple-50 prose-th:border prose-th:border-gray-300 prose-th:px-4 prose-th:py-2 prose-th:text-left prose-th:font-semibold
+                    prose-td:border prose-td:border-gray-300 prose-td:px-4 prose-td:py-2
+                    prose-hr:border-gray-300 prose-hr:my-8
+                  ">
+                    <ReactMarkdown
+                      components={{
+                        // 自定义图片渲染
+                        img: ({node, ...props}) => (
+                          <div className="my-6">
+                            <img {...props} className="rounded-lg shadow-lg w-full" alt={props.alt || '配图'} />
+                            {props.alt && props.alt !== '配图' && (
+                              <p className="text-center text-sm text-gray-500 mt-2 italic">{props.alt}</p>
+                            )}
+                          </div>
+                        ),
+                        // 自定义链接渲染
+                        a: ({node, ...props}) => (
+                          <a {...props} className="text-blue-600 hover:text-blue-700 underline" target="_blank" rel="noopener noreferrer" />
+                        ),
+                        // 自定义代码块渲染
+                        code: ({node, inline, className, children, ...props}) => {
+                          return inline ? (
+                            <code className="text-pink-600 bg-pink-50 px-1.5 py-0.5 rounded text-sm font-mono" {...props}>
+                              {children}
+                            </code>
+                          ) : (
+                            <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto my-4">
+                              <code className="text-sm font-mono" {...props}>{children}</code>
+                            </pre>
+                          )
+                        },
+                        // 自定义引用块渲染
+                        blockquote: ({node, children, ...props}) => (
+                          <blockquote className="border-l-4 border-purple-500 bg-purple-50 py-2 px-4 my-4 italic" {...props}>
+                            {children}
+                          </blockquote>
+                        )
+                      }}
+                    >
+                      {analysisResult.content}
+                    </ReactMarkdown>
                   </div>
                   <div className="mt-6 pt-4 border-t text-sm text-gray-500">
                     <p>

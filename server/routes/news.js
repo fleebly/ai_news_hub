@@ -6,17 +6,35 @@ const router = express.Router();
 /**
  * GET /api/ai-news
  * 获取AI新闻列表
+ * Query参数:
+ * - includeSocial: boolean, 是否包含社交媒体内容（默认true）
+ * - platform: string, 可选的平台过滤（reddit, twitter, weibo）
  */
 router.get('/ai-news', async (req, res) => {
   try {
-    console.log('Fetching AI news...');
-    const news = await newsService.aggregateNews();
+    const { includeSocial = 'true', platform } = req.query;
+    const shouldIncludeSocial = includeSocial === 'true';
+    
+    console.log('Fetching AI news...', { includeSocial: shouldIncludeSocial, platform });
+    
+    let news;
+    if (platform) {
+      // 只获取特定平台的内容
+      news = await newsService.getSocialMediaContent(platform);
+    } else {
+      // 获取所有内容
+      news = await newsService.aggregateNews(shouldIncludeSocial);
+    }
     
     res.json({
       success: true,
       news: news,
       lastUpdated: new Date().toISOString(),
-      count: news.length
+      count: news.length,
+      filters: {
+        includeSocial: shouldIncludeSocial,
+        platform: platform || 'all'
+      }
     });
   } catch (error) {
     console.error('Error fetching AI news:', error);
@@ -103,6 +121,36 @@ router.get('/news/sources', async (req, res) => {
     res.status(500).json({
       success: false,
       message: '获取RSS源失败',
+      error: process.env.NODE_ENV === 'development' ? error.message : '服务器错误'
+    });
+  }
+});
+
+/**
+ * GET /api/social-media
+ * 获取社交媒体内容
+ * Query参数:
+ * - platform: reddit | twitter | weibo (可选)
+ */
+router.get('/social-media', async (req, res) => {
+  try {
+    const { platform } = req.query;
+    console.log('Fetching social media content...', { platform: platform || 'all' });
+    
+    const content = await newsService.getSocialMediaContent(platform);
+    
+    res.json({
+      success: true,
+      content: content,
+      platform: platform || 'all',
+      count: content.length,
+      lastUpdated: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Error fetching social media:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取社交媒体内容失败',
       error: process.env.NODE_ENV === 'development' ? error.message : '服务器错误'
     });
   }
