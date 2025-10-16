@@ -32,6 +32,51 @@ import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import api from '../services/api'
 
+// 独立的图片渲染组件（避免Hooks问题）
+const MarkdownImage = ({ src, alt, ...props }) => {
+  const [imgError, setImgError] = useState(false)
+  const [imgLoading, setImgLoading] = useState(true)
+  
+  return (
+    <div className="my-8">
+      {!imgError ? (
+        <div className="relative">
+          {imgLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-xl min-h-[200px]">
+              <Loader className="h-8 w-8 text-purple-600 animate-spin" />
+            </div>
+          )}
+          <img 
+            src={src}
+            alt={alt || '配图'}
+            {...props}
+            className={`rounded-xl shadow-2xl w-full transition-opacity duration-500 ${imgLoading ? 'opacity-0' : 'opacity-100'}`}
+            onLoad={() => setImgLoading(false)}
+            onError={() => {
+              console.error('图片加载失败:', src?.substring(0, 100))
+              setImgError(true)
+              setImgLoading(false)
+            }}
+          />
+        </div>
+      ) : (
+        <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-8 text-center border-2 border-dashed border-purple-300 shadow-md">
+          <div className="text-6xl mb-4">🖼️</div>
+          <p className="text-gray-900 font-bold text-xl mb-3">
+            {alt || '图表说明'}
+          </p>
+          <p className="text-gray-600 text-base leading-loose max-w-2xl mx-auto">
+            图片加载失败，请查看PDF原文获取完整图表
+          </p>
+        </div>
+      )}
+      {alt && !imgError && (
+        <p className="text-center text-base text-gray-600 mt-4 italic leading-relaxed px-4">{alt}</p>
+      )}
+    </div>
+  )
+}
+
 const Papers = () => {
   const [papers, setPapers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -392,7 +437,7 @@ const Papers = () => {
     setAnalysisLogs([])
     
     // 检查缓存（除非强制刷新）
-    const cacheKey = `${paper.id}_${analysisLevel}`
+    const cacheKey = `${paper.id}_standard` // 固定使用standard模式
     if (!forceRefresh) {
       const cachedResult = getAnalysisFromCache(cacheKey, analysisMode)
       if (cachedResult) {
@@ -432,7 +477,7 @@ const Papers = () => {
             publishedAt: paper.publishedAt,
             pdfUrl: paper.pdfUrl || paper.arxivUrl
           },
-          level: analysisLevel
+          level: 'standard' // 固定使用标准模式（5页PDF + 视觉分析）
         })
       })
 
@@ -909,14 +954,38 @@ const Papers = () => {
               </div>
             )}
 
-            {/* Analysis Level Selector */}
+            {/* Start Analysis Button */}
             {!analyzing && !analysisResult && (
               <div className="p-4 bg-white border-b">
-                <div className="mb-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    分析级别
-                  </label>
-                  <div className="grid grid-cols-3 gap-3">
+                <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-6 mb-4">
+                  <div className="text-center">
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">🎯 AI深度解读</h3>
+                    <p className="text-gray-600 text-sm mb-4">
+                      采用先进的视觉AI技术，自动提取论文图表，生成图文并茂的专业解读文章
+                    </p>
+                    <div className="flex justify-center space-x-6 text-sm text-gray-700 mb-4">
+                      <div className="flex items-center">
+                        <span className="mr-1">📄</span>
+                        <span>PDF图片提取</span>
+                      </div>
+                      <div className="flex items-center">
+                        <span className="mr-1">🖼️</span>
+                        <span>关键图表识别</span>
+                      </div>
+                      <div className="flex items-center">
+                        <span className="mr-1">📝</span>
+                        <span>深度技术解析</span>
+                      </div>
+                    </div>
+                    <div className="flex justify-center space-x-4 text-xs text-gray-500">
+                      <span>⏱️ 预计2-4分钟</span>
+                      <span>📊 3000+字深度文章</span>
+                      <span>🖼️ 含实际图表</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="hidden grid-cols-3 gap-3">
                     {/* 快速模式 */}
                     <button
                       onClick={() => setAnalysisLevel('fast')}
@@ -1288,64 +1357,8 @@ const Papers = () => {
                       remarkPlugins={[remarkGfm, remarkMath]}
                       rehypePlugins={[rehypeKatex]}
                       components={{
-                        // 自定义图片渲染 - 添加错误处理和占位符
-                        img: ({node, ...props}) => {
-                          const [imgError, setImgError] = useState(false)
-                          const [imgLoading, setImgLoading] = useState(true)
-                          
-                          return (
-                            <div className="my-8">
-                              {!imgError ? (
-                                <div className="relative">
-                                  {imgLoading && (
-                                    <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-xl">
-                                      <Loader className="h-8 w-8 text-purple-600 animate-spin" />
-                                    </div>
-                                  )}
-                                  <img 
-                                    {...props} 
-                                    className={`rounded-xl shadow-xl w-full transition-opacity duration-300 ${imgLoading ? 'opacity-0' : 'opacity-100'}`}
-                                    alt={props.alt || '配图'} 
-                                    onLoad={() => setImgLoading(false)}
-                                    onError={() => {
-                                      setImgError(true)
-                                      setImgLoading(false)
-                                    }}
-                                  />
-                                </div>
-                              ) : (
-                                <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-8 text-center border-2 border-dashed border-purple-300">
-                                  <div className="text-5xl mb-4">📊</div>
-                                  <p className="text-gray-800 font-bold text-lg mb-3">
-                                    {props.alt?.split('：')[0] || '图表说明'}
-                                  </p>
-                                  <p className="text-gray-600 text-sm leading-loose max-w-3xl mx-auto mb-4">
-                                    {props.alt || '图表描述'}
-                                  </p>
-                                  <div className="flex items-center justify-center gap-3 text-xs pt-4 border-t border-purple-200">
-                                    <span className="text-gray-500">💡 AI生成的图表文字描述</span>
-                                    <span className="text-gray-300">•</span>
-                                    {selectedPaper?.pdfUrl && selectedPaper.pdfUrl !== '#' ? (
-                                      <a 
-                                        href={selectedPaper.pdfUrl} 
-                                        target="_blank" 
-                                        rel="noopener noreferrer"
-                                        className="text-blue-600 hover:text-blue-700 hover:underline font-medium"
-                                      >
-                                        📄 查看论文原图
-                                      </a>
-                                    ) : (
-                                      <span className="text-gray-400">原图请参考论文PDF</span>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                              {props.alt && props.alt !== '配图' && !imgError && (
-                                <p className="text-center text-sm text-gray-500 mt-3 italic leading-normal">{props.alt}</p>
-                              )}
-                            </div>
-                          )
-                        },
+                        // 使用独立的图片组件
+                        img: ({node, ...props}) => <MarkdownImage {...props} />,
                         // 自定义表格渲染 - 优化显示
                         table: ({node, children, ...props}) => (
                           <div className="my-8 overflow-x-auto rounded-xl shadow-lg border border-gray-200">
