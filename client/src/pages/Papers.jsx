@@ -999,9 +999,29 @@ const Papers = () => {
                                 </div>
                               ) : (
                                 <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-8 text-center border-2 border-dashed border-purple-300">
-                                  <div className="text-4xl mb-3">🖼️</div>
-                                  <p className="text-gray-600 font-medium">{props.alt || '插图'}</p>
-                                  <p className="text-gray-400 text-sm mt-2">（配图加载失败）</p>
+                                  <div className="text-5xl mb-4">📊</div>
+                                  <p className="text-gray-800 font-bold text-lg mb-3">
+                                    {props.alt?.split('：')[0] || '图表说明'}
+                                  </p>
+                                  <p className="text-gray-600 text-sm leading-loose max-w-3xl mx-auto mb-4">
+                                    {props.alt || '图表描述'}
+                                  </p>
+                                  <div className="flex items-center justify-center gap-3 text-xs pt-4 border-t border-purple-200">
+                                    <span className="text-gray-500">💡 AI生成的图表文字描述</span>
+                                    <span className="text-gray-300">•</span>
+                                    {selectedPaper?.pdfUrl && selectedPaper.pdfUrl !== '#' ? (
+                                      <a 
+                                        href={selectedPaper.pdfUrl} 
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 hover:text-blue-700 hover:underline font-medium"
+                                      >
+                                        📄 查看论文原图
+                                      </a>
+                                    ) : (
+                                      <span className="text-gray-400">原图请参考论文PDF</span>
+                                    )}
+                                  </div>
                                 </div>
                               )}
                               {props.alt && props.alt !== '配图' && !imgError && (
