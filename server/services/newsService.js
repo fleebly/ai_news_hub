@@ -2,6 +2,7 @@ const Parser = require('rss-parser');
 const NodeCache = require('node-cache');
 const axios = require('axios');
 const socialMediaService = require('./socialMediaService');
+const News = require('../models/News');
 
 // 创建缓存实例，缓存时间为30分钟，提升性能
 const cache = new NodeCache({ stdTTL: 1800 });
@@ -150,15 +151,43 @@ async function searchWithBrave(query) {
 
 /**
  * 聚合所有来源的新闻（包括社交媒体）
+ * 优先从数据库读取，后台同步更新
  */
-async function aggregateNews(includeSocial = true) {
-  const cacheKey = includeSocial ? 'all_news_with_social' : 'all_news';
-  const cached = cache.get(cacheKey);
-  if (cached) {
-    return cached;
-  }
-
+async function aggregateNews(includeSocial = true, forceRefresh = false) {
   try {
+    // 1. 尝试从数据库获取
+    if (!forceRefresh) {
+      const dbNews = await News.getLatest(50);
+      if (dbNews && dbNews.length > 0) {
+        console.log(`✅ 从数据库返回 ${dbNews.length} 条新闻`);
+        // 转换数据库格式为API格式
+        return dbNews.map(news => ({
+          id: news.newsId,
+          title: news.title,
+          summary: news.summary,
+          content: news.content,
+          category: news.category,
+          source: news.source,
+          sourceType: news.sourceType,
+          author: news.author,
+          publishedAt: news.publishedAt,
+          link: news.link,
+          imageUrl: news.imageUrl,
+          tags: news.tags,
+          views: news.views,
+          likes: news.likes,
+          comments: news.comments,
+          trending: news.trending,
+          platform: news.platform,
+          platformUrl: news.platformUrl
+        }));
+      }
+    }
+
+    // 2. 数据库为空或强制刷新，从外部源获取
+    console.log('📡 从外部源获取新闻...');
+    const cacheKey = includeSocial ? 'all_news_with_social' : 'all_news';
+    
     // 并行获取多个来源
     const promises = [
       fetchFromRSS(),
@@ -186,8 +215,13 @@ async function aggregateNews(includeSocial = true) {
     // 按发布时间排序
     uniqueNews.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
     
-    // 取前50条（因为现在有更多来源）
+    // 取前50条
     const topNews = uniqueNews.slice(0, 50);
+    
+    // 3. 保存到数据库（后台操作，不阻塞返回）
+    saveNewsToDatabase(topNews).catch(err => {
+      console.error('保存新闻到数据库失败:', err.message);
+    });
     
     cache.set(cacheKey, topNews);
     return topNews;
@@ -195,6 +229,60 @@ async function aggregateNews(includeSocial = true) {
     console.error('Error aggregating news:', error);
     return [];
   }
+}
+
+/**
+ * 保存新闻到数据库
+ */
+async function saveNewsToDatabase(newsArray) {
+  try {
+    // 转换为数据库格式
+    const newsDocuments = newsArray.map(news => ({
+      newsId: news.id,
+      title: news.title,
+      summary: news.summary || '',
+      content: news.content || '',
+      source: news.source || 'unknown',
+      sourceType: news.sourceType || determineSourceType(news),
+      author: news.author || '',
+      link: news.link,
+      imageUrl: news.imageUrl || '',
+      category: news.category || '',
+      tags: news.tags || [],
+      publishedAt: new Date(news.publishedAt),
+      views: news.views || 0,
+      likes: news.likes || 0,
+      comments: news.comments || 0,
+      trending: news.trending || false,
+      platform: news.platform || '',
+      platformUrl: news.platformUrl || '',
+      upvotes: news.upvotes || 0,
+      domain: news.domain || '',
+      fetchedAt: new Date()
+    }));
+
+    // 批量插入或更新
+    const result = await News.upsertMany(newsDocuments);
+    console.log(`💾 成功保存 ${result.upsertedCount + result.modifiedCount} 条新闻到数据库`);
+    
+    return result;
+  } catch (error) {
+    console.error('保存新闻到数据库失败:', error);
+    throw error;
+  }
+}
+
+/**
+ * 确定新闻来源类型
+ */
+function determineSourceType(news) {
+  if (news.platform) {
+    return news.platform.toLowerCase(); // reddit, twitter, weibo
+  }
+  if (news.source && news.source.includes('Brave')) {
+    return 'brave';
+  }
+  return 'rss';
 }
 
 /**
@@ -366,12 +454,19 @@ function calculateSimilarity(str1, str2) {
 }
 
 /**
- * 清除缓存
+ * 清除缓存并强制刷新数据
  */
-function clearCache() {
+async function clearCache() {
   cache.flushAll();
   socialMediaService.clearCache();
-  return { success: true, message: 'Cache cleared (including social media)' };
+  
+  // 强制刷新：从外部源获取最新数据并保存到数据库
+  try {
+    await aggregateNews(true, true);
+    return { success: true, message: '缓存已清除，数据已从外部源刷新' };
+  } catch (error) {
+    return { success: true, message: '缓存已清除，但数据刷新失败: ' + error.message };
+  }
 }
 
 module.exports = {
