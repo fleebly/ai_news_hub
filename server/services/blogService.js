@@ -2,11 +2,17 @@ const Parser = require('rss-parser');
 const NodeCache = require('node-cache');
 const axios = require('axios');
 
-// 创建缓存实例，缓存1小时
-const cache = new NodeCache({ stdTTL: 3600 });
+// 创建缓存实例，缓存2小时，提升性能
+const cache = new NodeCache({ stdTTL: 7200 });
+
+// 配置 parser 超时为15秒，避免长时间等待
 const parser = new Parser({
   customFields: {
     item: ['media:thumbnail', 'media:content', 'content:encoded']
+  },
+  timeout: 15000, // 15秒超时
+  headers: {
+    'User-Agent': 'Mozilla/5.0 (compatible; AI News Hub/1.0)'
   }
 });
 
@@ -109,17 +115,18 @@ const HIGH_QUALITY_BLOGS = [
     topics: ['LLaMA', '开源AI', 'PyTorch'],
     priority: 9
   },
-  {
-    name: 'Anthropic',
-    url: 'https://www.anthropic.com/blog/rss',
-    category: 'AI技术',
-    author: 'Anthropic Team',
-    company: 'Anthropic',
-    description: 'Claude AI背后的公司',
-    language: 'en',
-    topics: ['Claude', 'AI安全', '宪法AI'],
-    priority: 9
-  },
+  // Anthropic 博客经常返回404，已在下方添加其他URL
+  // {
+  //   name: 'Anthropic',
+  //   url: 'https://www.anthropic.com/blog/rss',
+  //   category: 'AI技术',
+  //   author: 'Anthropic Team',
+  //   company: 'Anthropic',
+  //   description: 'Claude AI背后的公司',
+  //   language: 'en',
+  //   topics: ['Claude', 'AI安全', '宪法AI'],
+  //   priority: 9
+  // },
   {
     name: 'Microsoft Research AI',
     url: 'https://www.microsoft.com/en-us/research/blog/category/artificial-intelligence/feed/',
@@ -179,28 +186,30 @@ const HIGH_QUALITY_BLOGS = [
     topics: ['可视化', '可解释性', '交互式论文'],
     priority: 10
   },
-  {
-    name: 'Hugging Face Blog',
-    url: 'https://huggingface.co/blog/feed.xml',
-    category: 'AI技术',
-    author: 'Hugging Face',
-    company: 'Hugging Face',
-    description: '开源AI社区领导者',
-    language: 'en',
-    topics: ['Transformers', '开源模型', 'Diffusion'],
-    priority: 9
-  },
-  {
-    name: 'Papers with Code',
-    url: 'https://paperswithcode.com/blog/rss',
-    category: '论文解读',
-    author: 'Papers with Code',
-    company: 'Meta',
-    description: '连接论文和代码实现',
-    language: 'en',
-    topics: ['SOTA', 'Benchmark', '代码实现'],
-    priority: 8
-  },
+  // Hugging Face 经常超时，暂时禁用
+  // {
+  //   name: 'Hugging Face Blog',
+  //   url: 'https://huggingface.co/blog/feed.xml',
+  //   category: 'AI技术',
+  //   author: 'Hugging Face',
+  //   company: 'Hugging Face',
+  //   description: '开源AI社区领导者',
+  //   language: 'en',
+  //   topics: ['Transformers', '开源模型', 'Diffusion'],
+  //   priority: 9
+  // },
+  // Papers with Code 经常超时，暂时禁用
+  // {
+  //   name: 'Papers with Code',
+  //   url: 'https://paperswithcode.com/blog/rss',
+  //   category: '论文解读',
+  //   author: 'Papers with Code',
+  //   company: 'Meta',
+  //   description: '连接论文和代码实现',
+  //   language: 'en',
+  //   topics: ['SOTA', 'Benchmark', '代码实现'],
+  //   priority: 8
+  // },
   
   // === 创业与商业洞察 ===
   {
@@ -214,40 +223,54 @@ const HIGH_QUALITY_BLOGS = [
     topics: ['创业', '融资', '产品'],
     priority: 9
   },
-  {
-    name: 'a16z',
-    url: 'https://a16z.com/feed/',
-    category: '创新创业',
-    author: 'Andreessen Horowitz',
-    company: 'a16z',
-    description: '硅谷知名VC的AI投资洞察',
-    language: 'en',
-    topics: ['AI投资', '科技趋势', '创业'],
-    priority: 8
-  },
-  {
-    name: 'Sam Altman',
-    url: 'https://blog.samaltman.com/feed',
-    category: '创新创业',
-    author: 'Sam Altman',
-    company: 'OpenAI',
-    description: 'OpenAI CEO，YC前总裁',
-    language: 'en',
-    topics: ['AGI', '创业哲学', '未来'],
-    priority: 10
-  },
+  // a16z 经常返回404，暂时禁用
+  // {
+  //   name: 'a16z',
+  //   url: 'https://a16z.com/feed/',
+  //   category: '创新创业',
+  //   author: 'Andreessen Horowitz',
+  //   company: 'a16z',
+  //   description: '硅谷知名VC的AI投资洞察',
+  //   language: 'en',
+  //   topics: ['AI投资', '科技趋势', '创业'],
+  //   priority: 8
+  // },
+  // Sam Altman 博客经常返回404，暂时禁用
+  // {
+  //   name: 'Sam Altman',
+  //   url: 'https://blog.samaltman.com/feed',
+  //   category: '创新创业',
+  //   author: 'Sam Altman',
+  //   company: 'OpenAI',
+  //   description: 'OpenAI CEO，YC前总裁',
+  //   language: 'en',
+  //   topics: ['AGI', '创业哲学', '未来'],
+  //   priority: 10
+  // },
   
   // === 中文顶级AI媒体 ===
+  // 机器之心经常返回404，暂时禁用
+  // {
+  //   name: '机器之心',
+  //   url: 'https://www.jiqizhixin.com/rss',
+  //   category: 'AI技术',
+  //   author: '机器之心',
+  //   company: '机器之心',
+  //   description: '中国最专业的AI媒体',
+  //   language: 'zh',
+  //   topics: ['AI技术', '论文解读', '行业动态'],
+  //   priority: 9
+  // }
   {
-    name: '机器之心',
-    url: 'https://www.jiqizhixin.com/rss',
+    name: 'Anthropic',
+    url: 'https://www.anthropic.com/news/rss.xml',
     category: 'AI技术',
-    author: '机器之心',
-    company: '机器之心',
-    description: '中国最专业的AI媒体',
-    language: 'zh',
-    topics: ['AI技术', '论文解读', '行业动态'],
-    priority: 9
+    author: 'Anthropic Team',
+    company: 'Anthropic',
+    description: 'Claude创造者，AI安全研究',
+    language: 'en',
+    topics: ['Claude', 'AI安全', 'Constitutional AI'],
+    priority: 10
   }
 ];
 

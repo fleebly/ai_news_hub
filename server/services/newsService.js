@@ -2,22 +2,27 @@ const Parser = require('rss-parser');
 const NodeCache = require('node-cache');
 const axios = require('axios');
 
-// 创建缓存实例，缓存时间为10分钟
-const cache = new NodeCache({ stdTTL: 600 });
+// 创建缓存实例，缓存时间为30分钟，提升性能
+const cache = new NodeCache({ stdTTL: 1800 });
 const parser = new Parser({
   customFields: {
     item: ['media:thumbnail', 'media:content']
+  },
+  timeout: 15000, // 15秒超时
+  headers: {
+    'User-Agent': 'Mozilla/5.0 (compatible; AI News Hub/1.0)'
   }
 });
 
-// RSS订阅源列表 - AI和编程相关的高质量内容源
+// RSS订阅源列表 - AI和编程相关的高质量内容源（移除了经常超时的源）
 const RSS_FEEDS = [
   { url: 'https://openai.com/blog/rss.xml', category: 'AI技术', source: 'OpenAI' },
   { url: 'https://blog.google/technology/ai/rss/', category: 'AI技术', source: 'Google AI' },
   { url: 'https://engineering.fb.com/feed/', category: 'AI技术', source: 'Meta Engineering' },
   { url: 'https://github.blog/feed/', category: '开发工具', source: 'GitHub Blog' },
   { url: 'https://blog.tensorflow.org/feeds/posts/default', category: 'AI技术', source: 'TensorFlow' },
-  { url: 'https://huggingface.co/blog/feed.xml', category: '开源项目', source: 'Hugging Face' },
+  // Hugging Face 经常超时，暂时禁用
+  // { url: 'https://huggingface.co/blog/feed.xml', category: '开源项目', source: 'Hugging Face' },
   { url: 'https://aws.amazon.com/blogs/machine-learning/feed/', category: 'AI应用', source: 'AWS ML' },
 ];
 

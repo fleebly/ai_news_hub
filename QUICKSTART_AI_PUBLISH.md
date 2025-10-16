@@ -36,6 +36,11 @@ OPENAI_API_KEY=sk-your_openai_api_key_here
 # 通义千问配置（https://dashscope.aliyuncs.com/）
 # TONGYI_API_KEY=your_tongyi_api_key_here
 
+# ========== 阿里云百炼配置（论文解读功能）==========
+# 获取地址：https://bailian.console.aliyun.com/
+ALIYUN_BAILIAN_API_KEY=your_dashscope_api_key_here
+ALIYUN_BAILIAN_MODEL=qwen-plus  # qwen-turbo, qwen-plus, qwen-max
+
 # 文心一言配置（https://cloud.baidu.com/）
 # WENXIN_API_KEY=your_wenxin_api_key_here
 # WENXIN_SECRET_KEY=your_wenxin_secret_key_here

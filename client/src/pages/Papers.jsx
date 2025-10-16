@@ -15,8 +15,13 @@ import {
   BookOpen,
   Brain,
   Code,
-  RefreshCw
+  RefreshCw,
+  Sparkles,
+  X,
+  Loader
 } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import api from '../services/api'
 
 const Papers = () => {
   const [papers, setPapers] = useState([])
@@ -26,6 +31,14 @@ const Papers = () => {
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [selectedConference, setSelectedConference] = useState('all')
   const [showTrendingOnly, setShowTrendingOnly] = useState(false)
+  
+  // AI解读相关状态
+  const [showAnalysisModal, setShowAnalysisModal] = useState(false)
+  const [selectedPaper, setSelectedPaper] = useState(null)
+  const [analysisMode, setAnalysisMode] = useState('summary')
+  const [analyzing, setAnalyzing] = useState(false)
+  const [analysisResult, setAnalysisResult] = useState(null)
+  const [analysisError, setAnalysisError] = useState('')
 
   const categories = [
     { id: 'all', name: '全部', icon: FileText },
@@ -256,6 +269,56 @@ const Papers = () => {
     }
   }
 
+  // AI解读功能
+  const handleAnalyze = async (paper) => {
+    setSelectedPaper(paper)
+    setShowAnalysisModal(true)
+    setAnalysisResult(null)
+    setAnalysisError('')
+    setAnalyzing(true)
+
+    try {
+      const response = await api.post('/paper-analysis/analyze', {
+        paper: {
+          title: paper.title,
+          abstract: paper.abstract,
+          authors: paper.authors,
+          publishedAt: paper.publishedAt
+        },
+        mode: analysisMode
+      })
+
+      if (response.data.success) {
+        setAnalysisResult(response.data.data)
+      } else {
+        setAnalysisError(response.data.message || '解读失败')
+      }
+    } catch (err) {
+      console.error('解读失败:', err)
+      setAnalysisError(err.response?.data?.message || '服务器错误，请稍后重试')
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
+  const handleDownloadAnalysis = () => {
+    if (!analysisResult) return
+
+    const content = `# ${analysisResult.title}\n\n` +
+      `**生成时间**: ${new Date(analysisResult.generatedAt).toLocaleString()}\n` +
+      `**原论文**: ${analysisResult.sourcePaper.title}\n` +
+      `**作者**: ${analysisResult.sourcePaper.authors?.join(', ') || '未知'}\n\n` +
+      `---\n\n${analysisResult.content}`
+
+    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${selectedPaper.title.substring(0, 30)}_${analysisMode}_${Date.now()}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 py-8">
@@ -447,6 +510,13 @@ const Papers = () => {
                   </div>
                   
                   <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handleAnalyze(paper)}
+                      className="flex items-center px-3 py-1 text-sm text-white bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 rounded-lg transition-colors shadow-sm hover:shadow-md"
+                    >
+                      <Sparkles className="h-4 w-4 mr-1" />
+                      AI解读
+                    </button>
                     {paper.pdfUrl && paper.pdfUrl !== '#' && (
                       <a 
                         href={paper.pdfUrl}
@@ -495,6 +565,116 @@ const Papers = () => {
           </div>
         )}
       </div>
+
+      {/* AI解读模态框 */}
+      {showAnalysisModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6 flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <Sparkles className="h-6 w-6" />
+                <h2 className="text-2xl font-bold">AI论文解读</h2>
+              </div>
+              <button
+                onClick={() => setShowAnalysisModal(false)}
+                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            {/* Paper Info */}
+            {selectedPaper && (
+              <div className="bg-gray-50 p-4 border-b">
+                <h3 className="font-semibold text-gray-900 mb-1">{selectedPaper.title}</h3>
+                <p className="text-sm text-gray-600">
+                  {selectedPaper.authors.join(', ')} · {selectedPaper.publishedAt}
+                </p>
+              </div>
+            )}
+
+            {/* Mode Selection */}
+            <div className="p-4 border-b bg-white">
+              <div className="flex items-center space-x-2">
+                <span className="text-sm font-medium text-gray-700">生成模式：</span>
+                <div className="flex space-x-2">
+                  {[
+                    { value: 'summary', label: '快速摘要', icon: FileText },
+                    { value: 'deep', label: '深度解读', icon: Brain },
+                    { value: 'commentary', label: '观点评论', icon: Sparkles }
+                  ].map((mode) => {
+                    const Icon = mode.icon
+                    return (
+                      <button
+                        key={mode.value}
+                        onClick={() => {
+                          setAnalysisMode(mode.value)
+                          if (selectedPaper && !analyzing) {
+                            handleAnalyze(selectedPaper)
+                          }
+                        }}
+                        disabled={analyzing}
+                        className={`flex items-center px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                          analysisMode === mode.value
+                            ? 'bg-purple-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        } ${analyzing ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <Icon className="h-4 w-4 mr-1" />
+                        {mode.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {analyzing && (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Loader className="h-12 w-12 text-purple-600 animate-spin mb-4" />
+                  <p className="text-gray-600 text-lg">AI正在解读论文...</p>
+                  <p className="text-gray-400 text-sm mt-2">这可能需要 30-60 秒</p>
+                </div>
+              )}
+
+              {analysisError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+                  <p className="font-medium">解读失败</p>
+                  <p className="text-sm mt-1">{analysisError}</p>
+                </div>
+              )}
+
+              {analysisResult && !analyzing && (
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-bold text-gray-900">{analysisResult.title}</h3>
+                    <button
+                      onClick={handleDownloadAnalysis}
+                      className="flex items-center px-3 py-1.5 text-sm text-green-600 hover:text-green-700 border border-green-200 rounded-lg hover:bg-green-50 transition-colors"
+                    >
+                      <Download className="h-4 w-4 mr-1" />
+                      下载
+                    </button>
+                  </div>
+                  <div className="prose prose-lg max-w-none">
+                    <ReactMarkdown>{analysisResult.content}</ReactMarkdown>
+                  </div>
+                  <div className="mt-6 pt-4 border-t text-sm text-gray-500">
+                    <p>
+                      生成时间：{new Date(analysisResult.generatedAt).toLocaleString()} | 
+                      模式：{analysisMode === 'summary' ? '快速摘要' : analysisMode === 'deep' ? '深度解读' : '观点评论'} |
+                      由阿里云百炼提供支持
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

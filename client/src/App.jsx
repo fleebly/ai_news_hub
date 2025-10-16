@@ -12,8 +12,9 @@ import TestQuestion from './pages/TestQuestion'
 import NewsDetail from './pages/NewsDetail'
 import Papers from './pages/Papers'
 import Blogs from './pages/Blogs'
-import Wechat from './pages/Wechat'
-import WechatDetail from './pages/WechatDetail'
+// import Wechat from './pages/Wechat'
+// import WechatDetail from './pages/WechatDetail'
+// import PaperAnalysis from './pages/PaperAnalysis'  // 已集成到论文页面
 import OpenSource from './pages/OpenSource'
 import Profile from './pages/Profile'
 import Leaderboard from './pages/Leaderboard'
@@ -68,14 +69,20 @@ function App() {
             path="/blogs" 
             element={<Blogs />} 
           />
-          <Route 
+          {/* AI解读功能已集成到论文页面 */}
+          {/* <Route 
+            path="/paper-analysis" 
+            element={<PaperAnalysis />} 
+          /> */}
+          {/* 临时禁用微信公众号功能以提升性能 */}
+          {/* <Route 
             path="/wechat" 
             element={<Wechat />} 
           />
           <Route 
             path="/wechat/:id" 
             element={<WechatDetail />} 
-          />
+          /> */}
           <Route 
             path="/opensource" 
             element={<OpenSource />} 
