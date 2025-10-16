@@ -412,16 +412,26 @@ const Papers = () => {
 
   // 打开AI解读Modal
   const openAnalysisModal = (paper) => {
-    setSelectedPaper(paper)
-    setShowAnalysisModal(true)
-    setAnalysisError('')
-    setAnalysisResult(null)
+    console.log('🚀 openAnalysisModal 被调用', paper)
     
-    // 检查是否有缓存的结果
-    const cachedResult = getAnalysisFromCache(paper.id, 'standard')
-    if (cachedResult) {
-      console.log('✅ 找到缓存的解读内容')
-      setAnalysisResult(cachedResult)
+    try {
+      setSelectedPaper(paper)
+      setShowAnalysisModal(true)
+      setAnalysisError('')
+      setAnalysisResult(null)
+      
+      console.log('✅ Modal状态已设置为true')
+      
+      // 检查是否有缓存的结果
+      const cachedResult = getAnalysisFromCache(paper.id, 'standard')
+      if (cachedResult) {
+        console.log('✅ 找到缓存的解读内容')
+        setAnalysisResult(cachedResult)
+      } else {
+        console.log('ℹ️ 未找到缓存，需要重新分析')
+      }
+    } catch (error) {
+      console.error('❌ openAnalysisModal 出错:', error)
     }
   }
 
