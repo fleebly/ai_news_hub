@@ -16,7 +16,7 @@ NODE_ENV=development
 OPENAI_API_KEY=
 
 # 阿里云百炼 API（用于论文解读）
-ALIYUN_BAILIAN_API_KEY=
+ALIYUN_BAILIAN_API_KEY=sk-f9f45a565287495f9d7bd4321fc735c6
 ALIYUN_BAILIAN_MODEL=qwen3-max
 
 # Brave Search API（用于搜索AI新闻，可选）

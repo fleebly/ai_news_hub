@@ -19,7 +19,11 @@ import {
   Sparkles,
   X,
   Loader,
-  Heart
+  Heart,
+  Edit,
+  Save,
+  Send,
+  XCircle
 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import api from '../services/api'
@@ -40,10 +44,16 @@ const Papers = () => {
   // AI解读相关状态
   const [showAnalysisModal, setShowAnalysisModal] = useState(false)
   const [selectedPaper, setSelectedPaper] = useState(null)
-  const [analysisMode, setAnalysisMode] = useState('summary')
+  const [analysisMode] = useState('deep') // 只保留深度解读
   const [analyzing, setAnalyzing] = useState(false)
   const [analysisResult, setAnalysisResult] = useState(null)
   const [analysisError, setAnalysisError] = useState('')
+  
+  // 编辑相关状态
+  const [isEditing, setIsEditing] = useState(false)
+  const [editedContent, setEditedContent] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [publishing, setPublishing] = useState(false)
 
   const categories = [
     { id: 'all', name: '全部', icon: FileText },
@@ -395,19 +405,96 @@ const Papers = () => {
   const handleDownloadAnalysis = () => {
     if (!analysisResult) return
 
-    const content = `# ${analysisResult.title}\n\n` +
+    const content = isEditing ? editedContent : analysisResult.content
+    const fullContent = `# ${analysisResult.title}\n\n` +
       `**生成时间**: ${new Date(analysisResult.generatedAt).toLocaleString()}\n` +
       `**原论文**: ${analysisResult.sourcePaper.title}\n` +
       `**作者**: ${analysisResult.sourcePaper.authors?.join(', ') || '未知'}\n\n` +
-      `---\n\n${analysisResult.content}`
+      `---\n\n${content}`
 
-    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
+    const blob = new Blob([fullContent], { type: 'text/markdown;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${selectedPaper.title.substring(0, 30)}_${analysisMode}_${Date.now()}.md`
+    a.download = `${selectedPaper.title.substring(0, 30)}_深度解读_${Date.now()}.md`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  // 开始编辑
+  const handleStartEdit = () => {
+    setIsEditing(true)
+    setEditedContent(analysisResult.content)
+  }
+
+  // 取消编辑
+  const handleCancelEdit = () => {
+    setIsEditing(false)
+    setEditedContent('')
+  }
+
+  // 保存编辑
+  const handleSaveEdit = async () => {
+    if (!editedContent.trim()) {
+      setAnalysisError('内容不能为空')
+      return
+    }
+
+    setSaving(true)
+    try {
+      // 更新本地状态
+      const updatedResult = {
+        ...analysisResult,
+        content: editedContent,
+        generatedAt: new Date().toISOString()
+      }
+      setAnalysisResult(updatedResult)
+      
+      // 更新缓存
+      saveAnalysisToCache(selectedPaper.id, analysisMode, updatedResult)
+      
+      setIsEditing(false)
+      setAnalysisError('')
+    } catch (err) {
+      console.error('保存失败:', err)
+      setAnalysisError('保存失败，请重试')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // 推送到公众号
+  const handlePublishToWechat = async () => {
+    if (!analysisResult) return
+
+    setPublishing(true)
+    setAnalysisError('')
+
+    try {
+      const content = isEditing ? editedContent : analysisResult.content
+      const response = await api.post('/wechat/publish-analysis', {
+        paper: {
+          title: selectedPaper.title,
+          authors: selectedPaper.authors,
+          publishedAt: selectedPaper.publishedAt
+        },
+        analysis: {
+          title: analysisResult.title,
+          content: content
+        }
+      })
+
+      if (response.data.success) {
+        alert('成功推送到微信公众号！')
+      } else {
+        setAnalysisError(response.data.message || '推送失败')
+      }
+    } catch (err) {
+      console.error('推送失败:', err)
+      setAnalysisError(err.response?.data?.message || '推送到公众号失败，请检查配置')
+    } finally {
+      setPublishing(false)
+    }
   }
 
   if (loading) {
@@ -711,41 +798,84 @@ const Papers = () => {
               </div>
             )}
 
-            {/* Mode Selection */}
-            <div className="p-4 border-b bg-white">
-              <div className="flex items-center space-x-2">
-                <span className="text-sm font-medium text-gray-700">生成模式：</span>
-                <div className="flex space-x-2">
-                  {[
-                    { value: 'summary', label: '快速摘要', icon: FileText },
-                    { value: 'deep', label: '深度解读', icon: Brain },
-                    { value: 'commentary', label: '观点评论', icon: Sparkles }
-                  ].map((mode) => {
-                    const Icon = mode.icon
-                    return (
-                      <button
-                        key={mode.value}
-                        onClick={() => {
-                          setAnalysisMode(mode.value)
-                          if (selectedPaper && !analyzing) {
-                            handleAnalyze(selectedPaper)
-                          }
-                        }}
-                        disabled={analyzing}
-                        className={`flex items-center px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                          analysisMode === mode.value
-                            ? 'bg-purple-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        } ${analyzing ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        <Icon className="h-4 w-4 mr-1" />
-                        {mode.label}
-                      </button>
-                    )
-                  })}
+            {/* Action Buttons */}
+            {analysisResult && !analyzing && (
+              <div className="p-4 border-b bg-white">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-medium text-gray-700">
+                    <span className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-800 rounded-md">
+                      <Brain className="h-4 w-4 mr-1" />
+                      深度解读
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {!isEditing ? (
+                      <>
+                        <button
+                          onClick={handleStartEdit}
+                          className="flex items-center px-3 py-1.5 text-sm text-blue-600 hover:text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+                        >
+                          <Edit className="h-4 w-4 mr-1" />
+                          编辑
+                        </button>
+                        <button
+                          onClick={handleDownloadAnalysis}
+                          className="flex items-center px-3 py-1.5 text-sm text-green-600 hover:text-green-700 border border-green-200 rounded-lg hover:bg-green-50 transition-colors"
+                        >
+                          <Download className="h-4 w-4 mr-1" />
+                          下载
+                        </button>
+                        <button
+                          onClick={handlePublishToWechat}
+                          disabled={publishing}
+                          className="flex items-center px-3 py-1.5 text-sm text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {publishing ? (
+                            <>
+                              <Loader className="h-4 w-4 mr-1 animate-spin" />
+                              推送中...
+                            </>
+                          ) : (
+                            <>
+                              <Send className="h-4 w-4 mr-1" />
+                              推送公众号
+                            </>
+                          )}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={handleCancelEdit}
+                          disabled={saving}
+                          className="flex items-center px-3 py-1.5 text-sm text-gray-600 hover:text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                        >
+                          <XCircle className="h-4 w-4 mr-1" />
+                          取消
+                        </button>
+                        <button
+                          onClick={handleSaveEdit}
+                          disabled={saving}
+                          className="flex items-center px-3 py-1.5 text-sm text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {saving ? (
+                            <>
+                              <Loader className="h-4 w-4 mr-1 animate-spin" />
+                              保存中...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="h-4 w-4 mr-1" />
+                              保存
+                            </>
+                          )}
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-6">
@@ -766,16 +896,23 @@ const Papers = () => {
 
               {analysisResult && !analyzing && (
                 <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl font-bold text-gray-900">{analysisResult.title}</h3>
-                    <button
-                      onClick={handleDownloadAnalysis}
-                      className="flex items-center px-3 py-1.5 text-sm text-green-600 hover:text-green-700 border border-green-200 rounded-lg hover:bg-green-50 transition-colors"
-                    >
-                      <Download className="h-4 w-4 mr-1" />
-                      下载
-                    </button>
-                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-4">{analysisResult.title}</h3>
+                  
+                  {isEditing ? (
+                    /* 编辑模式 */
+                    <div>
+                      <textarea
+                        value={editedContent}
+                        onChange={(e) => setEditedContent(e.target.value)}
+                        className="w-full h-[600px] p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono text-sm"
+                        placeholder="在此编辑Markdown内容..."
+                      />
+                      <p className="text-xs text-gray-500 mt-2">
+                        💡 提示：使用Markdown格式编辑，支持标题、列表、代码块、表格等
+                      </p>
+                    </div>
+                  ) : (
+                    /* 预览模式 */
                   <div className="prose prose-lg max-w-none 
                     prose-headings:font-bold prose-headings:text-gray-900 
                     prose-h1:text-3xl prose-h1:mb-4 prose-h1:mt-8 prose-h1:pb-3 prose-h1:border-b-2 prose-h1:border-purple-500
@@ -834,10 +971,12 @@ const Papers = () => {
                       {analysisResult.content}
                     </ReactMarkdown>
                   </div>
+                  )}
+                  
                   <div className="mt-6 pt-4 border-t text-sm text-gray-500">
                     <p>
                       生成时间：{new Date(analysisResult.generatedAt).toLocaleString()} | 
-                      模式：{analysisMode === 'summary' ? '快速摘要' : analysisMode === 'deep' ? '深度解读' : '观点评论'} |
+                      模式：深度解读 |
                       由阿里云百炼提供支持
                     </p>
                   </div>
