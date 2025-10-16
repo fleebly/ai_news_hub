@@ -91,14 +91,14 @@ router.get('/papers/trending', async (req, res) => {
 
 /**
  * POST /api/papers/refresh
- * 刷新论文缓存
+ * 刷新论文缓存并更新数据库
  */
 router.post('/papers/refresh', async (req, res) => {
   try {
-    const result = arxivService.clearCache();
+    const result = await arxivService.clearCache();
     res.json({
       success: true,
-      message: '缓存已清除，下次请求将获取最新数据',
+      message: '缓存已清除，数据已从arXiv刷新并更新到数据库',
       ...result
     });
   } catch (error) {

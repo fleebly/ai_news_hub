@@ -80,16 +80,16 @@ router.get('/ai-news/:id', async (req, res) => {
 
 /**
  * POST /api/ai-news/refresh
- * 刷新新闻缓存（管理员功能）
+ * 刷新新闻缓存并更新数据库（管理员功能）
  */
 router.post('/ai-news/refresh', async (req, res) => {
   try {
-    console.log('Clearing news cache...');
-    const result = newsService.clearCache();
+    console.log('Clearing news cache and refreshing from external sources...');
+    const result = await newsService.clearCache();
     
     res.json({
       success: true,
-      message: '缓存已清除，下次请求将获取最新数据',
+      message: '缓存已清除，数据已从外部源刷新并更新到数据库',
       ...result
     });
   } catch (error) {

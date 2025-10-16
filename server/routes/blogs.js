@@ -90,15 +90,15 @@ router.get('/blogs/sources', (req, res) => {
 
 /**
  * POST /api/blogs/refresh
- * 刷新博客缓存
+ * 刷新博客缓存并更新数据库
  */
-router.post('/blogs/refresh', (req, res) => {
+router.post('/blogs/refresh', async (req, res) => {
   try {
-    const result = blogService.clearCache();
+    const result = await blogService.clearCache();
     
     res.json({
       success: true,
-      message: '缓存已清除，下次请求将获取最新数据',
+      message: '缓存已清除，数据已从RSS源刷新并更新到数据库',
       ...result
     });
   } catch (error) {
