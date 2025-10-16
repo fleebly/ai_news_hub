@@ -271,9 +271,176 @@ class PDFVisionService {
   }
 
   /**
-   * 混合分析：完整流程
+   * 混合分析：完整流程（带进度回调）
+   */
+  async hybridAnalysisWithProgress(paper, aliyunService, mode = 'standard', progressCallback = null) {
+    const sendProgress = (progress, message, data = {}) => {
+      if (progressCallback) {
+        progressCallback(progress, message, data);
+      }
+    };
+
+    console.log('\n' + '='.repeat(60));
+    console.log('🚀 开始混合模型PDF分析');
+    console.log('='.repeat(60));
+
+    const startTime = Date.now();
+
+    try {
+      // 阶段1: 转换PDF为图片 (0-20%)
+      sendProgress(0, '📄 阶段1/4: 下载并转换PDF...', { stage: 'pdf' });
+      console.log('\n📄 阶段1: 转换PDF为图片...');
+      
+      const pdfResult = await this.convertPdfToImages(paper.pdfUrl || paper.pdf_url, {
+        maxPages: mode === 'deep' ? 10 : 5,
+        dpi: mode === 'deep' ? 200 : 150
+      });
+
+      if (!pdfResult.images || pdfResult.images.length === 0) {
+        throw new Error('PDF转换失败：没有生成图片');
+      }
+
+      sendProgress(20, `✅ PDF转换完成: ${pdfResult.images.length}页`, { 
+        stage: 'pdf', 
+        pages: pdfResult.images.length 
+      });
+
+      // 阶段2: 视觉模型分析 (20-60%)
+      sendProgress(20, '👁️ 阶段2/4: AI视觉分析中...', { stage: 'vision' });
+      console.log('\n👁️  阶段2: 视觉模型分析...');
+      
+      const totalPages = pdfResult.images.length;
+      const analysisResults = [];
+      
+      // 分批并行处理，每批发送进度
+      const concurrency = 3;
+      for (let i = 0; i < totalPages; i += concurrency) {
+        const batch = pdfResult.images.slice(i, i + concurrency);
+        const batchNum = Math.floor(i / concurrency) + 1;
+        const totalBatches = Math.ceil(totalPages / concurrency);
+        
+        sendProgress(
+          20 + (i / totalPages) * 40,
+          `🔍 分析第${i + 1}-${Math.min(i + concurrency, totalPages)}页 (${batchNum}/${totalBatches}批)`,
+          { stage: 'vision', current: i + 1, total: totalPages }
+        );
+        
+        const batchPromises = batch.map((img, idx) =>
+          this.analyzePageWithVision(img, i + idx + 1, aliyunService)
+        );
+
+        const batchResults = await Promise.all(batchPromises);
+        analysisResults.push(...batchResults);
+
+        // 批次间延迟
+        if (i + concurrency < totalPages) {
+          await this.delay(1000);
+        }
+      }
+
+      sendProgress(60, `✅ 视觉分析完成: ${totalPages}页`, { stage: 'vision' });
+
+      // 阶段3: 提取关键图表 (60-65%)
+      sendProgress(60, '🖼️ 阶段3/4: 提取关键图表...', { stage: 'figures' });
+      console.log('\n🖼️  阶段3: 提取关键图表...');
+      
+      const keyFigures = this.extractKeyFigures(analysisResults, pdfResult.images);
+      
+      sendProgress(65, `✅ 找到${keyFigures.length}个关键图表`, { 
+        stage: 'figures', 
+        count: keyFigures.length 
+      });
+
+      // 阶段4: 生成深度解读 (65-95%)
+      sendProgress(65, '📝 阶段4/4: AI生成深度解读...', { stage: 'generate' });
+      console.log('\n📝 阶段4: 生成深度解读...');
+      
+      const deepAnalysisPrompt = this.buildDeepAnalysisPrompt(
+        paper,
+        analysisResults,
+        keyFigures
+      );
+
+      sendProgress(70, '🤖 AI模型思考中（预计1-2分钟）...', { stage: 'generate' });
+
+      let content = await aliyunService.chat(
+        [
+          {
+            role: 'system',
+            content: '你是一位资深的AI研究专家和技术博主，擅长将复杂的AI论文转化为易懂且有深度的技术文章。'
+          },
+          {
+            role: 'user',
+            content: deepAnalysisPrompt
+          }
+        ],
+        {
+          maxTokens: 8000,
+          model: 'qwen-max',
+          temperature: 0.7
+        }
+      );
+
+      sendProgress(90, '🖼️ 嵌入图片...', { stage: 'embed' });
+
+      // 替换图片placeholder为实际的base64数据
+      console.log('\n🖼️  嵌入图片...');
+      keyFigures.forEach((figure, index) => {
+        const figNum = index + 1;
+        const placeholder = `FIGURE_${figNum}_PLACEHOLDER`;
+        const actualImageData = figure.imageBase64;
+        
+        content = content.replace(
+          new RegExp(placeholder, 'g'),
+          actualImageData
+        );
+      });
+
+      console.log(`✅ 已嵌入 ${keyFigures.length} 张图片`);
+
+      const endTime = Date.now();
+      const duration = ((endTime - startTime) / 1000).toFixed(1);
+
+      console.log('\n' + '='.repeat(60));
+      console.log(`✅ 混合分析完成！耗时: ${duration}秒`);
+      console.log(`📊 分析页数: ${pdfResult.images.length} 页`);
+      console.log(`🖼️  关键图表: ${keyFigures.length} 个`);
+      console.log(`📝 文章字数: ${content.length} 字`);
+      console.log('='.repeat(60));
+
+      sendProgress(95, '✅ 分析完成，准备返回结果...', { stage: 'done' });
+
+      return {
+        content,
+        keyFigures,
+        analysisResults,
+        metadata: {
+          pagesAnalyzed: pdfResult.images.length,
+          figuresFound: keyFigures.length,
+          duration: duration,
+          mode: mode,
+          contentLength: content.length
+        }
+      };
+
+    } catch (error) {
+      console.error('\n❌ 混合分析失败:', error.message);
+      sendProgress(0, `❌ 分析失败: ${error.message}`, { stage: 'error', error: true });
+      throw error;
+    }
+  }
+
+  /**
+   * 混合分析：完整流程（无进度回调）
    */
   async hybridAnalysis(paper, aliyunService, mode = 'standard') {
+    return this.hybridAnalysisWithProgress(paper, aliyunService, mode, null);
+  }
+
+  /**
+   * 旧版混合分析方法（保留兼容性）
+   */
+  async _hybridAnalysisOld(paper, aliyunService, mode = 'standard') {
     console.log('\n' + '='.repeat(60));
     console.log('🚀 开始混合模型PDF分析');
     console.log('='.repeat(60));

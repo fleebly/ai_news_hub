@@ -173,6 +173,140 @@ router.get('/status', (req, res) => {
 });
 
 /**
+ * POST /api/paper-analysis/analyze-hybrid-stream
+ * 混合模型分析（带实时进度）：PDF转图片 + 视觉理解 + 文本生成
+ * 使用Server-Sent Events实时推送进度
+ */
+router.post('/analyze-hybrid-stream', async (req, res) => {
+  const { paper, level = 'standard' } = req.body;
+  
+  if (!paper || !paper.title) {
+    return res.status(400).json({
+      success: false,
+      message: '请提供论文信息'
+    });
+  }
+
+  // 设置SSE头
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // 禁用nginx缓冲
+
+  // 发送进度的辅助函数
+  const sendProgress = (progress, message, data = {}) => {
+    res.write(`data: ${JSON.stringify({
+      progress,
+      message,
+      ...data
+    })}\n\n`);
+  };
+
+  try {
+    sendProgress(0, '开始分析...', { stage: 'init' });
+
+    // 验证level参数
+    const validLevels = ['fast', 'standard', 'deep'];
+    if (!validLevels.includes(level)) {
+      sendProgress(0, '无效的分析级别', { error: true });
+      res.write(`data: ${JSON.stringify({ done: true, success: false, message: '无效的分析级别' })}\n\n`);
+      return res.end();
+    }
+
+    sendProgress(5, `📊 分析级别: ${level}`, { stage: 'validate' });
+
+    // 快速模式
+    if (level === 'fast') {
+      sendProgress(10, '⚡ 使用快速模式（纯文本）', { stage: 'fast' });
+      sendProgress(50, '🤖 AI生成中...', { stage: 'generating' });
+      
+      const result = await aliyunBailianService.analyzePaper(paper, 'deep');
+      
+      sendProgress(100, '✅ 分析完成！', { stage: 'done' });
+      res.write(`data: ${JSON.stringify({
+        done: true,
+        success: true,
+        data: { ...result, level: 'fast', cost: 0.02 }
+      })}\n\n`);
+      return res.end();
+    }
+
+    // 标准/完整模式
+    const pdfUrl = paper.pdfUrl || paper.pdf_url;
+    
+    if (!pdfUrl || pdfUrl === '#') {
+      sendProgress(10, '⚠️ 无PDF URL，降级到快速模式', { stage: 'fallback' });
+      const result = await aliyunBailianService.analyzePaper(paper, 'deep');
+      res.write(`data: ${JSON.stringify({
+        done: true,
+        success: true,
+        data: { ...result, level: 'fast', fallback: true }
+      })}\n\n`);
+      return res.end();
+    }
+
+    // 检查Python环境
+    sendProgress(10, '🔍 检查环境...', { stage: 'check' });
+    const pythonOK = await pdfVisionService.checkPythonEnvironment();
+    
+    if (!pythonOK) {
+      sendProgress(15, '⚠️ Python环境未配置，降级', { stage: 'fallback' });
+      const result = await aliyunBailianService.analyzePaper(paper, 'deep');
+      res.write(`data: ${JSON.stringify({
+        done: true,
+        success: true,
+        data: { ...result, level: 'fast', fallback: true }
+      })}\n\n`);
+      return res.end();
+    }
+
+    // 执行混合分析（带进度回调）
+    sendProgress(15, '📄 开始PDF处理...', { stage: 'pdf' });
+    
+    const result = await pdfVisionService.hybridAnalysisWithProgress(
+      paper,
+      aliyunBailianService,
+      level === 'deep' ? 'deep' : 'standard',
+      (progress, message, data) => {
+        sendProgress(15 + progress * 0.85, message, data); // 15-100%
+      }
+    );
+
+    // 计算成本
+    const pagesAnalyzed = result.metadata.pagesAnalyzed;
+    const estimatedCost = 0.001 + (pagesAnalyzed * 0.15) + 0.02;
+
+    sendProgress(100, '✅ 分析完成！', { stage: 'done' });
+    res.write(`data: ${JSON.stringify({
+      done: true,
+      success: true,
+      data: {
+        title: `${paper.title} - 深度解读`,
+        content: result.content,
+        mode: 'deep',
+        level: level,
+        metadata: {
+          ...result.metadata,
+          estimatedCost: estimatedCost.toFixed(2) + '元',
+          duration: result.metadata.duration + '秒'
+        }
+      }
+    })}\n\n`);
+    res.end();
+
+  } catch (error) {
+    console.error('分析失败:', error);
+    sendProgress(0, `❌ 错误: ${error.message}`, { error: true });
+    res.write(`data: ${JSON.stringify({
+      done: true,
+      success: false,
+      error: error.message
+    })}\n\n`);
+    res.end();
+  }
+});
+
+/**
  * POST /api/paper-analysis/analyze-hybrid
  * 混合模型分析：PDF转图片 + 视觉理解 + 文本生成
  * 

@@ -54,6 +54,11 @@ const Papers = () => {
   const [analysisResult, setAnalysisResult] = useState(null)
   const [analysisError, setAnalysisError] = useState('')
   
+  // 进度相关状态
+  const [analysisProgress, setAnalysisProgress] = useState(0)
+  const [analysisStage, setAnalysisStage] = useState('')
+  const [analysisLogs, setAnalysisLogs] = useState([])
+  
   // 编辑相关状态
   const [isEditing, setIsEditing] = useState(false)
   const [editedContent, setEditedContent] = useState('')
@@ -377,22 +382,26 @@ const Papers = () => {
     }
   }
 
-  // AI解读功能（实际执行分析）
+  // AI解读功能（实际执行分析，带实时进度）
   const handleAnalyze = async (paper, forceRefresh = false) => {
     if (!paper) {
       paper = selectedPaper
     }
     
     setAnalysisError('')
+    setAnalysisLogs([])
     
     // 检查缓存（除非强制刷新）
-    const cacheKey = `${paper.id}_${analysisLevel}` // 使用级别作为缓存键的一部分
+    const cacheKey = `${paper.id}_${analysisLevel}`
     if (!forceRefresh) {
       const cachedResult = getAnalysisFromCache(cacheKey, analysisMode)
       if (cachedResult) {
         console.log('✅ 使用缓存的解读内容')
         setAnalysisResult(cachedResult)
         setAnalyzing(false)
+        setAnalysisProgress(100)
+        setAnalysisStage('cached')
+        setAnalysisLogs(['✅ 从缓存加载结果'])
         return
       }
     } else {
@@ -402,31 +411,85 @@ const Papers = () => {
     // 没有缓存或强制刷新，发起请求
     setAnalysisResult(null)
     setAnalyzing(true)
+    setAnalysisProgress(0)
+    setAnalysisStage('init')
 
     try {
-      // 使用混合分析API
-      const response = await api.post('/paper-analysis/analyze-hybrid', {
-        paper: {
-          title: paper.title,
-          abstract: paper.abstract,
-          authors: paper.authors,
-          publishedAt: paper.publishedAt,
-          pdfUrl: paper.pdfUrl || paper.arxivUrl // 提供PDF URL
+      // 使用SSE进行实时进度更新
+      const baseURL = api.defaults.baseURL || 'http://localhost:5000/api'
+      const url = `${baseURL}/paper-analysis/analyze-hybrid-stream`
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        level: analysisLevel
+        body: JSON.stringify({
+          paper: {
+            title: paper.title,
+            abstract: paper.abstract,
+            authors: paper.authors,
+            publishedAt: paper.publishedAt,
+            pdfUrl: paper.pdfUrl || paper.arxivUrl
+          },
+          level: analysisLevel
+        })
       })
 
-      if (response.data.success) {
-        const result = response.data.data
-        setAnalysisResult(result)
-        // 保存到缓存（使用cacheKey包含级别信息）
-        saveAnalysisToCache(cacheKey, analysisMode, result)
-      } else {
-        setAnalysisError(response.data.message || '解读失败')
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        
+        if (done) break
+        
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6))
+              
+              if (data.progress !== undefined) {
+                setAnalysisProgress(Math.round(data.progress))
+              }
+              
+              if (data.message) {
+                setAnalysisLogs(prev => [...prev, data.message])
+              }
+              
+              if (data.stage) {
+                setAnalysisStage(data.stage)
+              }
+              
+              if (data.done) {
+                if (data.success && data.data) {
+                  setAnalysisResult(data.data)
+                  saveAnalysisToCache(cacheKey, analysisMode, data.data)
+                } else if (data.error) {
+                  setAnalysisError(data.error || '分析失败')
+                }
+                break
+              }
+            } catch (e) {
+              console.error('解析SSE数据失败:', e)
+            }
+          }
+        }
+      }
+
     } catch (err) {
       console.error('解读失败:', err)
-      setAnalysisError(err.response?.data?.message || '服务器错误，请稍后重试')
+      setAnalysisError(err.message || '服务器错误，请稍后重试')
+      setAnalysisLogs(prev => [...prev, `❌ 错误: ${err.message}`])
     } finally {
       setAnalyzing(false)
     }
@@ -1097,30 +1160,80 @@ const Papers = () => {
             {/* Content */}
             <div className="flex-1 overflow-y-auto p-8 bg-gray-50">
               {analyzing && (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <Loader className="h-12 w-12 text-purple-600 animate-spin mb-4" />
-                  <p className="text-gray-600 text-lg">AI正在解读论文...</p>
-                  <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                    <div className="flex items-center justify-center space-x-2 text-sm">
-                      <span className="text-2xl">
-                        {analysisLevel === 'fast' && '⚡'}
-                        {analysisLevel === 'standard' && '🖼️'}
-                        {analysisLevel === 'deep' && '🔬'}
-                      </span>
-                      <span className="text-gray-700 font-medium">
-                        {analysisLevel === 'fast' && '快速模式'}
-                        {analysisLevel === 'standard' && '标准模式'}
-                        {analysisLevel === 'deep' && '完整模式'}
-                      </span>
+                <div className="py-8 px-6">
+                  {/* 标题和模式 */}
+                  <div className="flex items-center justify-center space-x-3 mb-6">
+                    <Loader className="h-8 w-8 text-purple-600 animate-spin" />
+                    <div>
+                      <p className="text-gray-900 text-xl font-bold">AI正在解读论文</p>
+                      <div className="flex items-center space-x-2 text-sm mt-1">
+                        <span className="text-2xl">
+                          {analysisLevel === 'fast' && '⚡'}
+                          {analysisLevel === 'standard' && '🖼️'}
+                          {analysisLevel === 'deep' && '🔬'}
+                        </span>
+                        <span className="text-gray-600 font-medium">
+                          {analysisLevel === 'fast' && '快速模式'}
+                          {analysisLevel === 'standard' && '标准模式'}
+                          {analysisLevel === 'deep' && '完整模式'}
+                        </span>
+                      </div>
                     </div>
-                    <p className="text-gray-400 text-sm mt-2 text-center">
-                      预计需要{' '}
-                      {analysisLevel === 'fast' && '1-3'}
-                      {analysisLevel === 'standard' && '2-4'}
-                      {analysisLevel === 'deep' && '3-5'}{' '}
-                      分钟，请耐心等待...
-                    </p>
                   </div>
+
+                  {/* 进度条 */}
+                  <div className="mb-6">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm font-medium text-gray-700">
+                        {analysisStage === 'init' && '初始化...'}
+                        {analysisStage === 'pdf' && '📄 处理PDF'}
+                        {analysisStage === 'vision' && '👁️ 视觉分析'}
+                        {analysisStage === 'figures' && '🖼️ 提取图表'}
+                        {analysisStage === 'generate' && '📝 生成解读'}
+                        {analysisStage === 'embed' && '🖼️ 嵌入图片'}
+                        {analysisStage === 'done' && '✅ 完成'}
+                      </span>
+                      <span className="text-sm font-bold text-purple-600">{analysisProgress}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-purple-600 to-blue-600 transition-all duration-500 ease-out rounded-full"
+                        style={{ width: `${analysisProgress}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 实时日志 */}
+                  <div className="bg-gray-900 rounded-lg p-4 max-h-64 overflow-y-auto">
+                    <div className="flex items-center space-x-2 mb-3 pb-2 border-b border-gray-700">
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                      <span className="text-green-400 text-xs font-mono font-bold">实时日志</span>
+                    </div>
+                    {analysisLogs.length === 0 ? (
+                      <p className="text-gray-500 text-sm font-mono">等待日志...</p>
+                    ) : (
+                      <div className="space-y-1">
+                        {analysisLogs.map((log, index) => (
+                          <div 
+                            key={index} 
+                            className="text-gray-300 text-sm font-mono leading-relaxed animate-fadeIn"
+                          >
+                            <span className="text-gray-600 mr-2">[{index + 1}]</span>
+                            {log}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 预计时间 */}
+                  <p className="text-gray-500 text-sm mt-4 text-center">
+                    ⏱️ 预计还需{' '}
+                    {analysisLevel === 'fast' && '1-3'}
+                    {analysisLevel === 'standard' && '2-4'}
+                    {analysisLevel === 'deep' && '3-5'}{' '}
+                    分钟，请耐心等待...
+                  </p>
                 </div>
               )}
 
