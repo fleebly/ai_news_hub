@@ -777,7 +777,7 @@ const Papers = () => {
       {/* AI解读模态框 */}
       {showAnalysisModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-7xl w-full max-h-[95vh] overflow-hidden flex flex-col">
             {/* Header */}
             <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6 flex items-center justify-between">
               <div className="flex items-center space-x-3">
@@ -882,7 +882,7 @@ const Papers = () => {
             )}
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-8 bg-gray-50">
               {analyzing && (
                 <div className="flex flex-col items-center justify-center py-12">
                   <Loader className="h-12 w-12 text-purple-600 animate-spin mb-4" />
@@ -917,6 +917,7 @@ const Papers = () => {
                     </div>
                   ) : (
                     /* 预览模式 */
+                  <div className="bg-white rounded-xl shadow-sm p-8">
                   <div className="prose prose-lg max-w-none 
                     prose-headings:font-bold prose-headings:text-gray-900 prose-headings:tracking-tight
                     prose-h1:text-4xl prose-h1:mb-6 prose-h1:mt-10 prose-h1:pb-4 prose-h1:border-b-2 prose-h1:border-purple-500 prose-h1:leading-tight
@@ -1052,15 +1053,16 @@ const Papers = () => {
                       {analysisResult.content}
                     </ReactMarkdown>
                   </div>
-                  )}
                   
-                  <div className="mt-6 pt-4 border-t text-sm text-gray-500">
+                  <div className="mt-8 pt-6 border-t border-gray-200 text-sm text-gray-500">
                     <p>
                       生成时间：{new Date(analysisResult.generatedAt).toLocaleString()} | 
                       模式：深度解读 |
                       由阿里云百炼提供支持
                     </p>
                   </div>
+                  </div>
+                  )}
                 </div>
               )}
             </div>
