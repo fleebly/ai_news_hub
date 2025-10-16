@@ -174,6 +174,62 @@ chmod +x start.sh
 docker-compose up -d
 ```
 
+### ☁️ 阿里云部署
+
+**推荐配置**: ECS 2核4G + Ubuntu 22.04
+
+#### 方法一：一键部署（推荐）
+
+```bash
+# 连接服务器
+ssh root@your-ecs-ip
+
+# 下载并运行部署脚本
+wget https://raw.githubusercontent.com/your-repo/ai_news_hub/main/deploy-aliyun.sh
+chmod +x deploy-aliyun.sh
+./deploy-aliyun.sh
+```
+
+#### 方法二：手动部署
+
+```bash
+# 1. 安装Docker和Docker Compose
+curl -fsSL https://get.docker.com | sh
+
+# 2. 克隆代码
+mkdir -p /www/apps && cd /www/apps
+git clone your-repo/ai_news_hub.git
+cd ai_news_hub
+
+# 3. 配置环境变量
+vim server/.env  # 填写API密钥
+
+# 4. 启动服务
+docker-compose up -d
+
+# 5. 初始化数据
+docker-compose exec app node server/scripts/syncData.js
+```
+
+#### 配置域名和SSL
+
+```bash
+# 安装Certbot
+apt install -y certbot
+
+# 申请免费SSL证书
+certbot certonly --standalone -d your-domain.com
+
+# 重启nginx
+docker-compose restart nginx
+```
+
+**📚 详细文档**:
+- [完整部署指南](docs/deployment/ALIYUN_DEPLOYMENT_GUIDE.md) - 包含4种部署方案
+- [快速部署](docs/deployment/QUICKSTART.md) - 5分钟快速上线
+- [性能优化](docs/deployment/ALIYUN_DEPLOYMENT_GUIDE.md#性能优化) - CDN、缓存配置
+- [监控告警](docs/deployment/ALIYUN_DEPLOYMENT_GUIDE.md#监控和日志) - 日志和监控
+
 ## 📖 功能详解
 
 ### 1. AI资讯

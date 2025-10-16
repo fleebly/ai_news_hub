@@ -54,6 +54,20 @@
 
 ---
 
+### 5️⃣ [部署文档](./deployment/) - Deployment
+生产环境部署、运维指南
+
+- **[阿里云完整部署指南](./deployment/ALIYUN_DEPLOYMENT_GUIDE.md)** - 详细的阿里云部署文档，包含4种部署方案
+- **[快速部署](./deployment/QUICKSTART.md)** - 5分钟快速部署到阿里云ECS
+
+部署方案对比：
+- **ECS + Docker** ⭐推荐 - 适合中小型项目
+- **ECS 传统部署** - 快速上线
+- **容器服务 ACK** - 大型项目
+- **Serverless** - 低成本试用
+
+---
+
 ## 🚀 快速开始
 
 ### 新用户推荐阅读顺序
@@ -72,9 +86,11 @@
 
 ### 运维人员
 
+- **快速部署**：[5分钟部署](./deployment/QUICKSTART.md) → [完整部署指南](./deployment/ALIYUN_DEPLOYMENT_GUIDE.md)
 - **环境配置**：[环境变量配置](../server/ENV_SETUP.md)
 - **API密钥**：[阿里云百炼配置](./setup/ALIYUN_BAILIAN_SETUP.md)
 - **性能调优**：[性能优化](./features/PERFORMANCE_OPTIMIZATION.md)
+- **监控运维**：[监控和日志](./deployment/ALIYUN_DEPLOYMENT_GUIDE.md#监控和日志)
 
 ---
 
