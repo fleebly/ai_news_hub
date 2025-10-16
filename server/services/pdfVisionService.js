@@ -203,7 +203,7 @@ class PDFVisionService {
   /**
    * 批量分析多页（并行处理）
    */
-  async analyzePagesInParallel(images, aliyunService, concurrency = 3) {
+  async analyzePagesInParallel(images, aliyunService, concurrency = 4) {
     console.log(`🔄 批量分析 ${images.length} 页（并发数：${concurrency}）...`);
 
     const results = [];
@@ -219,9 +219,9 @@ class PDFVisionService {
       const batchResults = await Promise.all(batchPromises);
       results.push(...batchResults);
 
-      // 批次间延迟，避免API限流
+      // 批次间延迟，避免API限流（减少到500ms）
       if (i + concurrency < images.length) {
-        await this.delay(1000);
+        await this.delay(500);
       }
     }
 
@@ -312,8 +312,8 @@ class PDFVisionService {
       const totalPages = pdfResult.images.length;
       const analysisResults = [];
       
-      // 分批并行处理，每批发送进度
-      const concurrency = 3;
+      // 分批并行处理，每批发送进度（提高并发度到4）
+      const concurrency = 4;
       for (let i = 0; i < totalPages; i += concurrency) {
         const batch = pdfResult.images.slice(i, i + concurrency);
         const batchNum = Math.floor(i / concurrency) + 1;
@@ -332,9 +332,9 @@ class PDFVisionService {
         const batchResults = await Promise.all(batchPromises);
         analysisResults.push(...batchResults);
 
-        // 批次间延迟
+        // 批次间延迟（减少到500ms）
         if (i + concurrency < totalPages) {
-          await this.delay(1000);
+          await this.delay(500);
         }
       }
 

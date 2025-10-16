@@ -50,7 +50,7 @@ class AliyunBailianService {
             'Authorization': `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json'
           },
-          timeout: 180000 // 180秒(3分钟)超时，深度解读需要更长时间
+          timeout: 360000 // 360秒(6分钟)超时，混合分析需要更长时间
         }
       );
 
@@ -137,7 +137,7 @@ class AliyunBailianService {
             'Authorization': `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json'
           },
-          timeout: 120000 // 2分钟超时
+          timeout: 180000 // 3分钟超时（视觉模型）
         }
       );
 
