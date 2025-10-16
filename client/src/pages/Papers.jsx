@@ -361,21 +361,25 @@ const Papers = () => {
   }
 
   // AI解读功能
-  const handleAnalyze = async (paper) => {
+  const handleAnalyze = async (paper, forceRefresh = false) => {
     setSelectedPaper(paper)
     setShowAnalysisModal(true)
     setAnalysisError('')
     
-    // 检查缓存
-    const cachedResult = getAnalysisFromCache(paper.id, analysisMode)
-    if (cachedResult) {
-      console.log('✅ 使用缓存的解读内容')
-      setAnalysisResult(cachedResult)
-      setAnalyzing(false)
-      return
+    // 检查缓存（除非强制刷新）
+    if (!forceRefresh) {
+      const cachedResult = getAnalysisFromCache(paper.id, analysisMode)
+      if (cachedResult) {
+        console.log('✅ 使用缓存的解读内容')
+        setAnalysisResult(cachedResult)
+        setAnalyzing(false)
+        return
+      }
+    } else {
+      console.log('🔄 强制重新解读，跳过缓存')
     }
 
-    // 没有缓存，发起请求
+    // 没有缓存或强制刷新，发起请求
     setAnalysisResult(null)
     setAnalyzing(true)
 
@@ -499,6 +503,23 @@ const Papers = () => {
     } finally {
       setPublishing(false)
     }
+  }
+
+  // 重新解读
+  const handleReanalyze = () => {
+    if (!selectedPaper) return
+    
+    // 询问用户确认
+    if (!window.confirm('确定要重新解读吗？这将覆盖当前的解读内容。')) {
+      return
+    }
+    
+    // 关闭编辑模式
+    setIsEditing(false)
+    setEditedContent('')
+    
+    // 强制刷新解读
+    handleAnalyze(selectedPaper, true)
   }
 
   if (loading) {
@@ -815,6 +836,15 @@ const Papers = () => {
                   <div className="flex items-center space-x-2">
                     {!isEditing ? (
                       <>
+                        <button
+                          onClick={handleReanalyze}
+                          disabled={analyzing}
+                          className="flex items-center px-3 py-1.5 text-sm text-purple-600 hover:text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="重新生成AI解读内容"
+                        >
+                          <RefreshCw className={`h-4 w-4 mr-1 ${analyzing ? 'animate-spin' : ''}`} />
+                          重新解读
+                        </button>
                         <button
                           onClick={handleStartEdit}
                           className="flex items-center px-3 py-1.5 text-sm text-blue-600 hover:text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
