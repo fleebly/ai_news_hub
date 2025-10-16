@@ -49,6 +49,7 @@ const Papers = () => {
   const [showAnalysisModal, setShowAnalysisModal] = useState(false)
   const [selectedPaper, setSelectedPaper] = useState(null)
   const [analysisMode] = useState('deep') // 只保留深度解读
+  const [analysisLevel, setAnalysisLevel] = useState('standard') // 混合模型级别
   const [analyzing, setAnalyzing] = useState(false)
   const [analysisResult, setAnalysisResult] = useState(null)
   const [analysisError, setAnalysisError] = useState('')
@@ -360,15 +361,34 @@ const Papers = () => {
     }
   }
 
-  // AI解读功能
-  const handleAnalyze = async (paper, forceRefresh = false) => {
+  // 打开AI解读Modal
+  const openAnalysisModal = (paper) => {
     setSelectedPaper(paper)
     setShowAnalysisModal(true)
     setAnalysisError('')
+    setAnalysisResult(null)
+    
+    // 检查是否有缓存的结果
+    const cacheKey = `${paper.id}_${analysisLevel}`
+    const cachedResult = getAnalysisFromCache(cacheKey, analysisMode)
+    if (cachedResult) {
+      console.log('✅ 找到缓存的解读内容')
+      setAnalysisResult(cachedResult)
+    }
+  }
+
+  // AI解读功能（实际执行分析）
+  const handleAnalyze = async (paper, forceRefresh = false) => {
+    if (!paper) {
+      paper = selectedPaper
+    }
+    
+    setAnalysisError('')
     
     // 检查缓存（除非强制刷新）
+    const cacheKey = `${paper.id}_${analysisLevel}` // 使用级别作为缓存键的一部分
     if (!forceRefresh) {
-      const cachedResult = getAnalysisFromCache(paper.id, analysisMode)
+      const cachedResult = getAnalysisFromCache(cacheKey, analysisMode)
       if (cachedResult) {
         console.log('✅ 使用缓存的解读内容')
         setAnalysisResult(cachedResult)
@@ -384,21 +404,23 @@ const Papers = () => {
     setAnalyzing(true)
 
     try {
-      const response = await api.post('/paper-analysis/analyze', {
+      // 使用混合分析API
+      const response = await api.post('/paper-analysis/analyze-hybrid', {
         paper: {
           title: paper.title,
           abstract: paper.abstract,
           authors: paper.authors,
-          publishedAt: paper.publishedAt
+          publishedAt: paper.publishedAt,
+          pdfUrl: paper.pdfUrl || paper.arxivUrl // 提供PDF URL
         },
-        mode: analysisMode
+        level: analysisLevel
       })
 
       if (response.data.success) {
         const result = response.data.data
         setAnalysisResult(result)
-        // 保存到缓存
-        saveAnalysisToCache(paper.id, analysisMode, result)
+        // 保存到缓存（使用cacheKey包含级别信息）
+        saveAnalysisToCache(cacheKey, analysisMode, result)
       } else {
         setAnalysisError(response.data.message || '解读失败')
       }
@@ -458,8 +480,9 @@ const Papers = () => {
       }
       setAnalysisResult(updatedResult)
       
-      // 更新缓存
-      saveAnalysisToCache(selectedPaper.id, analysisMode, updatedResult)
+      // 更新缓存（使用cacheKey包含级别信息）
+      const cacheKey = `${selectedPaper.id}_${analysisLevel}`
+      saveAnalysisToCache(cacheKey, analysisMode, updatedResult)
       
       setIsEditing(false)
       setAnalysisError('')
@@ -740,7 +763,7 @@ const Papers = () => {
                       {isFavorite(paper.id) ? '已收藏' : '收藏'}
                     </button>
                     <button
-                      onClick={() => handleAnalyze(paper)}
+                      onClick={() => openAnalysisModal(paper)}
                       className="flex items-center px-3 py-1 text-sm text-white bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 rounded-lg transition-colors shadow-sm hover:shadow-md"
                     >
                       <Sparkles className="h-4 w-4 mr-1" />
@@ -823,15 +846,175 @@ const Papers = () => {
               </div>
             )}
 
+            {/* Analysis Level Selector */}
+            {!analyzing && !analysisResult && (
+              <div className="p-4 bg-white border-b">
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    分析级别
+                  </label>
+                  <div className="grid grid-cols-3 gap-3">
+                    {/* 快速模式 */}
+                    <button
+                      onClick={() => setAnalysisLevel('fast')}
+                      className={`p-4 border-2 rounded-lg transition-all ${
+                        analysisLevel === 'fast'
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-center mb-2">
+                        <span className="text-2xl">⚡</span>
+                      </div>
+                      <div className="text-center">
+                        <div className="font-semibold text-gray-900 mb-1">快速模式</div>
+                        <div className="text-xs text-gray-600 mb-2">纯文本分析</div>
+                        <div className="text-sm">
+                          <span className="text-green-600 font-bold">免费</span>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">1-3分钟</div>
+                      </div>
+                    </button>
+
+                    {/* 标准模式 */}
+                    <button
+                      onClick={() => setAnalysisLevel('standard')}
+                      className={`p-4 border-2 rounded-lg transition-all relative ${
+                        analysisLevel === 'standard'
+                          ? 'border-purple-500 bg-purple-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="absolute top-2 right-2">
+                        <span className="text-xs bg-yellow-400 text-yellow-900 px-2 py-0.5 rounded-full font-semibold">
+                          推荐
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-center mb-2">
+                        <span className="text-2xl">🖼️</span>
+                      </div>
+                      <div className="text-center">
+                        <div className="font-semibold text-gray-900 mb-1">标准模式</div>
+                        <div className="text-xs text-gray-600 mb-2">含关键图表</div>
+                        <div className="text-sm">
+                          <span className="text-purple-600 font-bold">~0.8元</span>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">2-4分钟</div>
+                      </div>
+                    </button>
+
+                    {/* 完整模式 */}
+                    <button
+                      onClick={() => setAnalysisLevel('deep')}
+                      className={`p-4 border-2 rounded-lg transition-all ${
+                        analysisLevel === 'deep'
+                          ? 'border-indigo-500 bg-indigo-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-center mb-2">
+                        <span className="text-2xl">🔬</span>
+                      </div>
+                      <div className="text-center">
+                        <div className="font-semibold text-gray-900 mb-1">完整模式</div>
+                        <div className="text-xs text-gray-600 mb-2">深度全面分析</div>
+                        <div className="text-sm">
+                          <span className="text-indigo-600 font-bold">~1.5元</span>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">3-5分钟</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Level Description */}
+                <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                  <div className="text-sm text-gray-700">
+                    {analysisLevel === 'fast' && (
+                      <div className="flex items-start">
+                        <span className="mr-2">⚡</span>
+                        <div>
+                          <strong>快速模式：</strong>基于论文标题和摘要进行文本分析，生成详细的配图描述。适合快速了解论文核心内容。
+                        </div>
+                      </div>
+                    )}
+                    {analysisLevel === 'standard' && (
+                      <div className="flex items-start">
+                        <span className="mr-2">🖼️</span>
+                        <div>
+                          <strong>标准模式：</strong>读取论文PDF前5页，使用视觉AI识别关键图表（架构图、流程图、实验结果），生成图文并茂的深度解读。<span className="text-purple-600 font-semibold">推荐使用</span>。
+                        </div>
+                      </div>
+                    )}
+                    {analysisLevel === 'deep' && (
+                      <div className="flex items-start">
+                        <span className="mr-2">🔬</span>
+                        <div>
+                          <strong>完整模式：</strong>读取论文PDF前10页，进行全面的视觉分析，提取所有重要图表和技术细节，生成最完整的专业解读。
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Start Analysis Button */}
+                <div className="mt-4">
+                  <button
+                    onClick={() => handleAnalyze(selectedPaper)}
+                    disabled={analyzing}
+                    className="w-full flex items-center justify-center px-6 py-3 text-base font-medium text-white bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 rounded-lg transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {analyzing ? (
+                      <>
+                        <Loader className="h-5 w-5 mr-2 animate-spin" />
+                        分析中...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-5 w-5 mr-2" />
+                        开始AI解读
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Action Buttons */}
             {analysisResult && !analyzing && (
               <div className="p-4 border-b bg-white">
                 <div className="flex items-center justify-between">
-                  <div className="text-sm font-medium text-gray-700">
-                    <span className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-800 rounded-md">
+                  <div className="flex items-center space-x-3">
+                    <span className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-800 rounded-md text-sm font-medium">
                       <Brain className="h-4 w-4 mr-1" />
                       深度解读
                     </span>
+                    {/* 显示分析级别 */}
+                    <span className="inline-flex items-center px-2 py-1 bg-gray-100 text-gray-700 rounded-md text-xs">
+                      {analysisResult.level === 'fast' && '⚡ 快速模式'}
+                      {analysisResult.level === 'standard' && '🖼️ 标准模式'}
+                      {analysisResult.level === 'deep' && '🔬 完整模式'}
+                    </span>
+                    {/* 显示成本和时长 */}
+                    {analysisResult.metadata && (
+                      <div className="flex items-center space-x-2 text-xs text-gray-500">
+                        {analysisResult.metadata.estimatedCost && (
+                          <span>💰 {analysisResult.metadata.estimatedCost}</span>
+                        )}
+                        {analysisResult.metadata.duration && (
+                          <span>⏱️ {analysisResult.metadata.duration}</span>
+                        )}
+                        {analysisResult.metadata.figuresFound > 0 && (
+                          <span>🖼️ {analysisResult.metadata.figuresFound}张图表</span>
+                        )}
+                      </div>
+                    )}
+                    {/* 降级提示 */}
+                    {analysisResult.fallback && (
+                      <span className="inline-flex items-center px-2 py-1 bg-yellow-100 text-yellow-800 rounded-md text-xs" title={analysisResult.fallbackReason}>
+                        ⚠️ 已降级
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center space-x-2">
                     {!isEditing ? (
@@ -917,7 +1100,27 @@ const Papers = () => {
                 <div className="flex flex-col items-center justify-center py-12">
                   <Loader className="h-12 w-12 text-purple-600 animate-spin mb-4" />
                   <p className="text-gray-600 text-lg">AI正在解读论文...</p>
-                  <p className="text-gray-400 text-sm mt-2">这可能需要 1-3 分钟，请耐心等待...</p>
+                  <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                    <div className="flex items-center justify-center space-x-2 text-sm">
+                      <span className="text-2xl">
+                        {analysisLevel === 'fast' && '⚡'}
+                        {analysisLevel === 'standard' && '🖼️'}
+                        {analysisLevel === 'deep' && '🔬'}
+                      </span>
+                      <span className="text-gray-700 font-medium">
+                        {analysisLevel === 'fast' && '快速模式'}
+                        {analysisLevel === 'standard' && '标准模式'}
+                        {analysisLevel === 'deep' && '完整模式'}
+                      </span>
+                    </div>
+                    <p className="text-gray-400 text-sm mt-2 text-center">
+                      预计需要{' '}
+                      {analysisLevel === 'fast' && '1-3'}
+                      {analysisLevel === 'standard' && '2-4'}
+                      {analysisLevel === 'deep' && '3-5'}{' '}
+                      分钟，请耐心等待...
+                    </p>
+                  </div>
                 </div>
               )}
 
