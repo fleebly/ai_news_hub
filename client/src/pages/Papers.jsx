@@ -437,9 +437,8 @@ const Papers = () => {
     setAnalysisLogs([])
     
     // 检查缓存（除非强制刷新）
-    const cacheKey = `${paper.id}_standard` // 固定使用standard模式
     if (!forceRefresh) {
-      const cachedResult = getAnalysisFromCache(cacheKey, analysisMode)
+      const cachedResult = getAnalysisFromCache(paper.id, 'standard')
       if (cachedResult) {
         console.log('✅ 使用缓存的解读内容')
         setAnalysisResult(cachedResult)
@@ -518,7 +517,7 @@ const Papers = () => {
               if (data.done) {
                 if (data.success && data.data) {
                   setAnalysisResult(data.data)
-                  saveAnalysisToCache(cacheKey, analysisMode, data.data)
+                  saveAnalysisToCache(paper.id, 'standard', data.data)
                 } else if (data.error) {
                   setAnalysisError(data.error || '分析失败')
                 }
@@ -588,9 +587,8 @@ const Papers = () => {
       }
       setAnalysisResult(updatedResult)
       
-      // 更新缓存（使用cacheKey包含级别信息）
-      const cacheKey = `${selectedPaper.id}_${analysisLevel}`
-      saveAnalysisToCache(cacheKey, analysisMode, updatedResult)
+      // 更新缓存
+      saveAnalysisToCache(selectedPaper.id, 'standard', updatedResult)
       
       setIsEditing(false)
       setAnalysisError('')
