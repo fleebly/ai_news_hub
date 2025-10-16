@@ -1,6 +1,7 @@
 const axios = require('axios');
 const xml2js = require('xml2js');
 const NodeCache = require('node-cache');
+const Paper = require('../models/Paper');
 
 // 创建缓存实例，缓存30分钟
 const cache = new NodeCache({ stdTTL: 1800 });
@@ -108,9 +109,39 @@ async function fetchArxivPapers(category = 'cs.AI', maxResults = 50) {
 
 /**
  * 获取多个分类的论文
+ * 优先从数据库读取，后台同步更新
  */
-async function fetchMultiCategoryPapers(categories = ['cs.AI', 'cs.LG', 'cs.CV', 'cs.CL'], maxPerCategory = 20) {
+async function fetchMultiCategoryPapers(categories = ['cs.AI', 'cs.LG', 'cs.CV', 'cs.CL'], maxPerCategory = 20, forceRefresh = false) {
   try {
+    // 1. 尝试从数据库获取
+    if (!forceRefresh) {
+      const dbPapers = await Paper.getLatest(100);
+      if (dbPapers && dbPapers.length > 0) {
+        console.log(`✅ 从数据库返回 ${dbPapers.length} 篇论文`);
+        // 转换数据库格式为API格式
+        return dbPapers.map(paper => ({
+          id: paper.paperId,
+          arxivId: paper.paperId.replace('arxiv_', ''),
+          title: paper.title,
+          authors: paper.authors,
+          conference: paper.conference,
+          category: paper.category,
+          publishedAt: paper.publishedAt.toISOString().split('T')[0],
+          abstract: paper.abstract,
+          tags: paper.tags,
+          citations: paper.citations,
+          views: paper.views,
+          pdfUrl: paper.pdfUrl,
+          arxivUrl: paper.arxivUrl,
+          codeUrl: paper.codeUrl,
+          trending: paper.trending,
+          hotScore: paper.qualityScore
+        }));
+      }
+    }
+
+    // 2. 数据库为空或强制刷新，从arXiv获取
+    console.log('📡 从arXiv获取论文...');
     const promises = categories.map(cat => fetchArxivPapers(cat, maxPerCategory));
     const results = await Promise.allSettled(promises);
     
@@ -130,14 +161,57 @@ async function fetchMultiCategoryPapers(categories = ['cs.AI', 'cs.LG', 'cs.CV',
     uniquePapers.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
 
     // 计算热门度并标记
-    return uniquePapers.map(paper => ({
+    const enrichedPapers = uniquePapers.map(paper => ({
       ...paper,
       trending: calculateTrending(paper),
       hotScore: calculateHotScore(paper)
     }));
+
+    // 3. 保存到数据库（后台操作，不阻塞返回）
+    savePapersToDatabase(enrichedPapers).catch(err => {
+      console.error('保存论文到数据库失败:', err.message);
+    });
+
+    return enrichedPapers;
   } catch (error) {
     console.error('Error fetching multi-category papers:', error);
     return [];
+  }
+}
+
+/**
+ * 保存论文到数据库
+ */
+async function savePapersToDatabase(papersArray) {
+  try {
+    // 转换为数据库格式
+    const paperDocuments = papersArray.map(paper => ({
+      paperId: paper.id,
+      title: paper.title,
+      abstract: paper.abstract,
+      authors: paper.authors || [],
+      category: paper.category || 'other',
+      conference: paper.conference || 'arXiv',
+      arxivUrl: paper.arxivUrl || '',
+      pdfUrl: paper.pdfUrl || '',
+      codeUrl: paper.codeUrl || '',
+      tags: paper.tags || [],
+      publishedAt: new Date(paper.publishedAt),
+      citations: paper.citations || 0,
+      views: paper.views || 0,
+      trending: paper.trending || false,
+      qualityScore: paper.hotScore || 0,
+      fetchedAt: new Date()
+    }));
+
+    // 批量插入或更新
+    const result = await Paper.upsertMany(paperDocuments);
+    console.log(`💾 成功保存 ${result.upsertedCount + result.modifiedCount} 篇论文到数据库`);
+    
+    return result;
+  } catch (error) {
+    console.error('保存论文到数据库失败:', error);
+    throw error;
   }
 }
 
@@ -294,11 +368,18 @@ function calculateHotScore(paper) {
 }
 
 /**
- * 清除缓存
+ * 清除缓存并强制刷新数据
  */
-function clearCache() {
+async function clearCache() {
   cache.flushAll();
-  return { success: true, message: 'Cache cleared' };
+  
+  // 强制刷新：从arXiv获取最新数据并保存到数据库
+  try {
+    await fetchMultiCategoryPapers(['cs.AI', 'cs.LG', 'cs.CV', 'cs.CL'], 20, true);
+    return { success: true, message: '缓存已清除，数据已从arXiv刷新' };
+  } catch (error) {
+    return { success: true, message: '缓存已清除，但数据刷新失败: ' + error.message };
+  }
 }
 
 module.exports = {

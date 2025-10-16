@@ -1,5 +1,6 @@
 const Parser = require('rss-parser');
 const NodeCache = require('node-cache');
+const Blog = require('../models/Blog');
 const axios = require('axios');
 
 // 创建缓存实例，缓存2小时，提升性能
@@ -277,14 +278,43 @@ const HIGH_QUALITY_BLOGS = [
 /**
  * 获取所有高质量博客文章
  */
-async function fetchAllBlogs(limit = 50) {
-  const cacheKey = `all_blogs_${limit}`;
-  const cached = cache.get(cacheKey);
-  if (cached) {
-    return cached;
-  }
-
+async function fetchAllBlogs(limit = 150, forceRefresh = false) {
   try {
+    // 1. 尝试从数据库获取
+    if (!forceRefresh) {
+      const dbBlogs = await Blog.getLatest(limit);
+      if (dbBlogs && dbBlogs.length > 0) {
+        console.log(`✅ 从数据库返回 ${dbBlogs.length} 篇博客`);
+        // 转换数据库格式为API格式
+        return dbBlogs.map(blog => ({
+          id: blog.blogId,
+          title: blog.title,
+          summary: blog.summary,
+          content: blog.content,
+          author: blog.author,
+          company: blog.company,
+          blogName: blog.source,
+          category: blog.category,
+          publishedAt: blog.publishedAt.toISOString(),
+          link: blog.link,
+          imageUrl: blog.imageUrl,
+          tags: blog.tags,
+          topics: blog.topics,
+          readTime: blog.readTime,
+          difficulty: blog.difficulty,
+          views: blog.views,
+          likes: blog.likes,
+          featured: blog.featured,
+          trending: blog.trending,
+          qualityScore: blog.qualityScore
+        }));
+      }
+    }
+
+    // 2. 数据库为空或强制刷新，从RSS获取
+    console.log('📡 从RSS源获取博客...');
+    const cacheKey = `all_blogs_${limit}`;
+    
     console.log('Fetching blogs from', HIGH_QUALITY_BLOGS.length, 'sources...');
     
     // 并行获取所有博客
@@ -310,6 +340,11 @@ async function fetchAllBlogs(limit = 50) {
     // 限制数量
     const topArticles = allArticles.slice(0, limit);
     
+    // 3. 保存到数据库（后台操作，不阻塞返回）
+    saveBlogsToDatabase(topArticles).catch(err => {
+      console.error('保存博客到数据库失败:', err.message);
+    });
+    
     cache.set(cacheKey, topArticles);
     console.log(`✅ Successfully fetched ${topArticles.length} blog articles`);
     
@@ -317,6 +352,48 @@ async function fetchAllBlogs(limit = 50) {
   } catch (error) {
     console.error('Error fetching blogs:', error);
     return [];
+  }
+}
+
+/**
+ * 保存博客到数据库
+ */
+async function saveBlogsToDatabase(blogsArray) {
+  try {
+    // 转换为数据库格式
+    const blogDocuments = blogsArray.map(blog => ({
+      blogId: blog.id,
+      title: blog.title,
+      summary: blog.summary || '',
+      content: blog.content || '',
+      author: blog.author || '',
+      source: blog.blogName || '',
+      company: blog.company || '',
+      link: blog.link,
+      imageUrl: blog.imageUrl || '',
+      category: blog.category || 'other',
+      tags: blog.tags || [],
+      topics: blog.topics || [],
+      difficulty: blog.difficulty || 'intermediate',
+      readTime: blog.readTime || 5,
+      publishedAt: new Date(blog.publishedAt),
+      views: blog.views || 0,
+      likes: blog.likes || 0,
+      shares: blog.shares || 0,
+      featured: blog.featured || false,
+      trending: blog.trending || false,
+      qualityScore: blog.qualityScore || 0,
+      fetchedAt: new Date()
+    }));
+
+    // 批量插入或更新
+    const result = await Blog.upsertMany(blogDocuments);
+    console.log(`💾 成功保存 ${result.upsertedCount + result.modifiedCount} 篇博客到数据库`);
+    
+    return result;
+  } catch (error) {
+    console.error('保存博客到数据库失败:', error);
+    throw error;
   }
 }
 
@@ -533,9 +610,16 @@ function calculateReadTime(content) {
 /**
  * 清除缓存
  */
-function clearCache() {
+async function clearCache() {
   cache.flushAll();
-  return { success: true, message: 'Blog cache cleared' };
+  
+  // 强制刷新：从RSS源获取最新数据并保存到数据库
+  try {
+    await fetchAllBlogs(150, true);
+    return { success: true, message: '缓存已清除，数据已从RSS源刷新' };
+  } catch (error) {
+    return { success: true, message: '缓存已清除，但数据刷新失败: ' + error.message };
+  }
 }
 
 /**
