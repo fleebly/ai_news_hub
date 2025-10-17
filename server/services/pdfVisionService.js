@@ -137,67 +137,93 @@ class PDFVisionService {
       }
     ];
 
-    try {
-      // 使用aliyunBailianService的chatWithVision方法
-      // 需要将base64转换为临时URL或直接传递
-      const imageDataUrl = `data:image/jpeg;base64,${imageBase64}`;
-      
-      const result = await aliyunService.chatWithVision(
-        messages,
-        imageDataUrl,
-        {
-          model: 'qwen-vl-plus',
-          maxTokens: 3000  // 增加token限制，支持更详细的分析
-        }
-      );
-
-      // 尝试解析JSON
+    // 添加重试机制（最多3次）
+    let lastError;
+    for (let retry = 0; retry < 3; retry++) {
       try {
-        // 先尝试提取JSON代码块
-        let jsonMatch = result.match(/```json\s*([\s\S]*?)\s*```/);
-        if (!jsonMatch) {
-          // 如果没有代码块，直接匹配JSON对象
-          jsonMatch = result.match(/\{[\s\S]*\}/);
+        if (retry > 0) {
+          console.log(`  🔄 重试第${retry}次 (第${pageNumber}页)...`);
+          // 重试前等待，避免立即触发限流
+          await this.delay(2000 * retry); // 2s, 4s
+        }
+
+        // 使用aliyunBailianService的chatWithVision方法
+        const imageDataUrl = `data:image/jpeg;base64,${imageBase64}`;
+        
+        const result = await aliyunService.chatWithVision(
+          messages,
+          imageDataUrl,
+          {
+            model: 'qwen-vl-plus',
+            maxTokens: 3000  // 增加token限制，支持更详细的分析
+          }
+        );
+        
+        // 如果成功，跳出重试循环
+        lastError = null;
+
+        // 尝试解析JSON
+        try {
+          // 先尝试提取JSON代码块
+          let jsonMatch = result.match(/```json\s*([\s\S]*?)\s*```/);
+          if (!jsonMatch) {
+            // 如果没有代码块，直接匹配JSON对象
+            jsonMatch = result.match(/\{[\s\S]*\}/);
+          }
+          
+          if (jsonMatch) {
+            const jsonStr = jsonMatch[1] || jsonMatch[0];
+            const parsed = JSON.parse(jsonStr);
+            
+            // 确保所有必要字段都存在
+            return {
+              pageType: parsed.pageType || 'unknown',
+              hasImportantFigure: parsed.hasImportantFigure || false,
+              figureType: parsed.figureType || '',
+              figureTitle: parsed.figureTitle || '',
+              figureDescription: parsed.figureDescription || '',
+              keyPoints: parsed.keyPoints || [],
+              technicalDepth: parsed.technicalDepth || 'medium',
+              containsCoreTech: parsed.containsCoreTech || false,
+              rawAnalysis: result
+            };
+          }
+        } catch (e) {
+          console.warn(`⚠️  JSON解析失败 (第${pageNumber}页):`, e.message);
+          // 如果JSON解析失败，尝试从文本中提取关键信息
+        }
+
+        // 如果不是JSON或解析失败，返回原始文本分析
+        return {
+          pageType: 'unknown',
+          hasImportantFigure: false,
+          rawAnalysis: result,
+          keyPoints: []
+        };
+
+      } catch (error) {
+        lastError = error;
+        console.error(`❌ 分析第${pageNumber}页失败 (尝试${retry + 1}/3):`, error.message);
+        
+        // 如果是429错误（限流），继续重试
+        if (error.response && error.response.status === 429 && retry < 2) {
+          continue;
         }
         
-        if (jsonMatch) {
-          const jsonStr = jsonMatch[1] || jsonMatch[0];
-          const parsed = JSON.parse(jsonStr);
-          
-          // 确保所有必要字段都存在
-          return {
-            pageType: parsed.pageType || 'unknown',
-            hasImportantFigure: parsed.hasImportantFigure || false,
-            figureType: parsed.figureType || '',
-            figureTitle: parsed.figureTitle || '',
-            figureDescription: parsed.figureDescription || '',
-            keyPoints: parsed.keyPoints || [],
-            technicalDepth: parsed.technicalDepth || 'medium',
-            containsCoreTech: parsed.containsCoreTech || false,
-            rawAnalysis: result
-          };
+        // 其他错误或最后一次重试，直接退出
+        if (retry === 2) {
+          break;
         }
-      } catch (e) {
-        console.warn(`⚠️  JSON解析失败 (第${pageNumber}页):`, e.message);
-        // 如果JSON解析失败，尝试从文本中提取关键信息
       }
-
-      // 如果不是JSON或解析失败，返回原始文本分析
-      return {
-        pageType: 'unknown',
-        hasImportantFigure: false,
-        rawAnalysis: result,
-        keyPoints: []
-      };
-
-    } catch (error) {
-      console.error(`❌ 分析第${pageNumber}页失败:`, error.message);
-      return {
-        pageType: 'error',
-        hasImportantFigure: false,
-        error: error.message
-      };
     }
+
+    // 所有重试都失败
+    console.error(`❌ 分析第${pageNumber}页最终失败，已重试3次`);
+    return {
+      pageType: 'error',
+      hasImportantFigure: false,
+      error: lastError?.message || '分析失败'
+    };
   }
 
   /**
@@ -351,15 +377,23 @@ class PDFVisionService {
         count: keyFigures.length 
       });
 
+      // 检查是否需要降级（无图片时的纯文字解读）
+      const useFallbackMode = keyFigures.length === 0;
+      if (useFallbackMode) {
+        console.log('\n⚠️  视觉分析失败，使用降级模式（纯文字解读）');
+        sendProgress(65, '⚠️ 视觉分析失败，将生成纯文字解读...', { 
+          stage: 'fallback',
+          warning: true
+        });
+      }
+
       // 阶段4: 生成深度解读 (65-95%)
       sendProgress(65, '📝 阶段4/4: AI生成深度解读...', { stage: 'generate' });
       console.log('\n📝 阶段4: 生成深度解读...');
       
-      const deepAnalysisPrompt = this.buildDeepAnalysisPrompt(
-        paper,
-        analysisResults,
-        keyFigures
-      );
+      const deepAnalysisPrompt = useFallbackMode 
+        ? this.buildFallbackAnalysisPrompt(paper)  // 降级：纯文字解读
+        : this.buildDeepAnalysisPrompt(paper, analysisResults, keyFigures);  // 正常：图文并茂
 
       sendProgress(70, '🤖 AI模型思考中（预计1-2分钟）...', { stage: 'generate' });
 
@@ -557,6 +591,70 @@ class PDFVisionService {
       console.log('⚠️  降级到纯文本模式...');
       throw error; // 让上层处理降级
     }
+  }
+
+  /**
+   * 构建降级分析Prompt（纯文字，无图片）
+   */
+  buildFallbackAnalysisPrompt(paper) {
+    return `你是一位资深的AI研究专家，请基于论文的标题和摘要，撰写一篇2000-3000字的高质量论文解读：
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📄 论文基本信息
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+**标题**: ${paper.title}
+**作者**: ${paper.authors ? paper.authors.join(', ') : '未知'}
+**发表时间**: ${paper.publishedAt || paper.published || '未知'}
+**会议/期刊**: ${paper.conference || '未知'}
+**论文摘要**:
+${paper.abstract || paper.summary || '暂无摘要'}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📝 写作要求
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. **文章结构** (必须包含以下部分):
+   - 📌 核心要点速览 (3-5点，每点一句话)
+   - 🎯 研究背景与动机
+   - 💡 核心创新点详解
+   - 🔬 技术方法说明
+   - 📊 实验结果分析
+   - 💭 个人评价与展望
+
+2. **内容深度**:
+   - 深入浅出，专业但易懂
+   - 重点解释核心创新点
+   - 分析技术优势和局限性
+   - 讨论实际应用价值
+
+3. **数学公式格式** (⚠️ 非常重要):
+   - 行内公式: 使用单个美元符号包裹 \`$公式$\`
+   - 块级公式: 使用双美元符号独立成行
+     \`\`\`
+     $$
+     公式内容
+     $$
+     \`\`\`
+   - 示例:
+     * 行内: "损失函数定义为 $L = \\sum_{i=1}^{n} (y_i - \\hat{y}_i)^2$"
+     * 块级:
+       $$
+       \\text{Attention}(Q, K, V) = \\text{softmax}\\left(\\frac{QK^T}{\\sqrt{d_k}}\\right)V
+       $$
+
+4. **Markdown格式要求**:
+   - 使用 # 二级标题 (##)
+   - 列表使用 - 或 1. 
+   - 重点内容使用 **加粗**
+   - 代码/公式使用行内代码格式 \`code\`
+   - 表格使用标准Markdown格式
+
+5. **特别注意**:
+   ⚠️ 由于PDF图片提取失败，本文为纯文字解读
+   ⚠️ 请在文章开头注明"注：本文基于论文摘要生成，不含论文图表"
+   ⚠️ 尽可能详细地描述方法和结果，弥补无图表的缺憾
+
+请现在开始撰写，确保公式格式正确、内容深入、排版美观！`;
   }
 
   /**
@@ -772,14 +870,25 @@ ${keyFigures.find(f => f.figureType && (
    - 复杂概念要拆解说明
    - 避免空洞的形容词
 
-4. **Markdown格式严格要求**：
+4. **Markdown和LaTeX格式严格要求** (⚠️ 非常重要):
+   
+   **数学公式规范**：
+   - 行内公式: 使用单个美元符号包裹 \`$公式$\`
+     * 示例: "损失函数为 $L = \\sum_{i=1}^{n} (y_i - \\hat{y}_i)^2$"
+   - 块级公式: 使用双美元符号独立成行，前后必须空行
+     \`\`\`
+     $$
+     \\text{Attention}(Q, K, V) = \\text{softmax}\\left(\\frac{QK^T}{\\sqrt{d_k}}\\right)V
+     $$
+     \`\`\`
+   - LaTeX符号必须使用双反斜杠转义: \\\\alpha, \\\\beta, \\\\sum, \\\\int
+   
+   **Markdown排版规范**：
    - 标题：使用 ## 和 ### 层级，标题前后空行
    - 列表：每项前空行，内容详实
    - 表格：必须对齐，前后空行
-   - 代码块：使用三个反引号加语言名，注释清晰
-   - 数学公式：行内用 $x = y$，块级用 $$公式$$，前后空行
-   - LaTeX符号：使用反斜杠转义，如 \\alpha, \\beta, \\sum, \\int
-   - 段落：段与段之间空一行，避免拥挤
+   - 代码块：使用三个反引号加语言名
+   - 段落：段与段之间空一行
 
 5. **基于真实内容**：
    - 严格基于上面提供的PDF分析结果
