@@ -337,6 +337,51 @@ const Papers = () => {
     }
   }
 
+  // 爬取最新热门论文
+  const handleCrawl = async () => {
+    try {
+      setRefreshing(true)
+      const response = await fetch('http://localhost:5000/api/papers/crawl', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          useArxiv: true,    // 使用arXiv（最稳定）
+          reddit: false,      // 外部API不稳定，默认关闭
+          papersWithCode: false,
+          huggingface: false,
+          twitter: false,
+          limit: 50          // 增加数量
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        let message = `🎉 成功爬取 ${data.total} 篇最新论文！\n\n📡 来源统计:\n`
+        if (data.sources.arxiv > 0) message += `- arXiv: ${data.sources.arxiv} 篇\n`
+        if (data.sources.reddit > 0) message += `- Reddit: ${data.sources.reddit} 篇\n`
+        if (data.sources.papersWithCode > 0) message += `- Papers with Code: ${data.sources.papersWithCode} 篇\n`
+        if (data.sources.huggingface > 0) message += `- Hugging Face: ${data.sources.huggingface} 篇\n`
+        if (data.tip) message += `\n💡 ${data.tip}`
+        
+        alert(message)
+        // 重新获取数据
+        await fetchPapers()
+      } else {
+        let errorMsg = `❌ ${data.message || '爬取失败'}`
+        if (data.tip) errorMsg += `\n\n💡 ${data.tip}`
+        alert(errorMsg)
+      }
+    } catch (error) {
+      console.error('爬取失败:', error)
+      alert('❌ 爬取失败: ' + error.message + '\n\n💡 建议使用"刷新"按钮（🔄）')
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
   // 切换收藏
   const toggleFavorite = (paperId) => {
     setFavorites(prev => {
@@ -703,6 +748,15 @@ const Papers = () => {
                 title="刷新论文"
               >
                 <RefreshCw className={`h-5 w-5 ${refreshing ? 'animate-spin' : ''}`} />
+              </button>
+              <button
+                onClick={handleCrawl}
+                disabled={refreshing}
+                className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 rounded-lg transition-all shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                title="从Reddit、Papers with Code、Hugging Face等爬取最新热门论文"
+              >
+                <TrendingUp className={`h-4 w-4 ${refreshing ? 'animate-pulse' : ''}`} />
+                <span>爬取热门</span>
               </button>
             </div>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">

@@ -162,7 +162,36 @@ class AliyunBailianService {
 
       if (response.data.output && response.data.output.choices && response.data.output.choices.length > 0) {
         console.log('✅ 多模态模型响应成功');
-        return response.data.output.choices[0].message.content;
+        const content = response.data.output.choices[0].message.content;
+        
+        // 处理content可能是数组的情况
+        if (Array.isArray(content)) {
+          console.log(`   content是数组，长度: ${content.length}`);
+          // 提取text类型的内容
+          const textContent = content
+            .filter(item => {
+              console.log(`   item类型: ${item.type || '无type'}, 有text: ${!!item.text}`);
+              return item.type === 'text' || item.text;  // 兼容没有type的情况
+            })
+            .map(item => item.text)
+            .join('\n');
+          
+          if (textContent) {
+            console.log(`   提取到文本内容，长度: ${textContent.length}字`);
+            return textContent;
+          } else {
+            console.warn(`   ⚠️  未提取到text内容，返回JSON字符串`);
+            return JSON.stringify(content);
+          }
+        }
+        
+        // 如果是对象但不是数组，转为字符串
+        if (typeof content === 'object') {
+          return JSON.stringify(content);
+        }
+        
+        // 否则直接返回（应该是字符串）
+        return content;
       }
 
       throw new Error('无效的API响应格式');

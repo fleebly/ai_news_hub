@@ -12,6 +12,77 @@ class PDFVisionService {
   constructor() {
     this.pythonScript = path.join(__dirname, '../scripts/pdf_converter.py');
     this.enabled = true; // 可以通过环境变量控制
+    
+    // 随机解读风格配置
+    this.writingStyles = [
+      {
+        name: '学术严谨风格',
+        tone: '严谨、专业、学术化',
+        structure: '按照学术论文结构组织，强调理论基础和实验验证',
+        language: '使用专业术语，逻辑严密，引用规范'
+      },
+      {
+        name: '通俗易懂风格',
+        tone: '轻松、生动、易理解',
+        structure: '采用总分总结构，多用类比和比喻',
+        language: '避免过多术语，用日常语言解释复杂概念'
+      },
+      {
+        name: '工程实践风格',
+        tone: '实用、直接、面向应用',
+        structure: '重点关注方法实现和工程细节',
+        language: '强调可操作性，提供代码示例思路'
+      },
+      {
+        name: '批判分析风格',
+        tone: '客观、批判、深入',
+        structure: '在介绍的基础上增加批判性分析',
+        language: '指出优势和局限性，提出改进方向'
+      },
+      {
+        name: '故事叙述风格',
+        tone: '有趣、引人入胜',
+        structure: '以故事线索展开，强调研究动机和发展过程',
+        language: '使用叙事手法，让技术内容更有吸引力'
+      }
+    ];
+    
+    // 随机格式配置
+    this.formatStyles = [
+      {
+        name: '标准学术格式',
+        sections: ['研究背景', '核心贡献', '技术方法', '实验结果', '结论展望'],
+        emphasis: '结构完整，层次分明'
+      },
+      {
+        name: '问答式格式',
+        sections: ['问题提出', '为什么重要', '如何解决', '效果如何', '未来方向'],
+        emphasis: '以问题驱动，逻辑清晰'
+      },
+      {
+        name: '亮点优先格式',
+        sections: ['核心亮点', '创新之处', '技术细节', '性能表现', '应用价值'],
+        emphasis: '突出创新点，吸引读者'
+      },
+      {
+        name: '对比式格式',
+        sections: ['现有方法局限', '本文解决方案', '关键改进', '实验对比', '总结'],
+        emphasis: '强调对比，突出优势'
+      }
+    ];
+  }
+  
+  /**
+   * 随机选择解读风格
+   */
+  getRandomStyle() {
+    const style = this.writingStyles[Math.floor(Math.random() * this.writingStyles.length)];
+    const format = this.formatStyles[Math.floor(Math.random() * this.formatStyles.length)];
+    
+    console.log(`🎨 随机选择风格: ${style.name}`);
+    console.log(`📋 随机选择格式: ${format.name}`);
+    
+    return { style, format };
   }
 
   /**
@@ -19,13 +90,13 @@ class PDFVisionService {
    */
   async convertPdfToImages(pdfUrl, options = {}) {
     const {
-      maxPages = 5,
+      maxPages = 999,  // 默认不限制页数，读取完整论文
       dpi = 150,
       quality = 85
     } = options;
 
     console.log(`📄 开始转换PDF: ${pdfUrl}`);
-    console.log(`   - 最多页数: ${maxPages}`);
+    console.log(`   - 最多页数: ${maxPages === 999 ? '不限制（完整论文）' : maxPages}`);
     console.log(`   - 分辨率: ${dpi} DPI`);
 
     return new Promise((resolve, reject) => {
@@ -89,60 +160,40 @@ class PDFVisionService {
       },
       {
         role: 'user',
-        content: `这是一篇AI论文PDF的第${pageNumber}页图片。请你详细分析这一页的内容：
+        content: `这是一篇AI论文PDF的第${pageNumber}页图片。请识别页面中的**核心图表**并返回其位置和描述。
 
-📋 **分析任务**：
-
-1. **页面类型识别**：
-   - 这是论文的哪个部分？（标题页/摘要/引言/相关工作/方法/实验/结论/参考文献等）
-   
-2. **图表检测**（重要！）：
-   - 是否包含图表（架构图/流程图/算法图/实验结果图/对比图/公式等）？
-   - 如果有图表，它是什么类型？
-   
-3. **图表详细描述**（如果有图表，这是最重要的部分！）：
-   - 图表的标题和编号
-   - 图表展示了什么内容？
-   - 图表的关键元素（模块/箭头/数据/趋势等）
-   - 图表中的文字信息
-   - 图表要表达的核心观点
-   - 用至少150字详细描述
-   
-4. **文字内容提取**：
-   - 提取这一页的关键技术信息（算法/公式/方法/结论等）
-   - 至少提取3-5个关键点
-
-5. **技术深度评估**：
-   - 这一页的技术含量（高/中/低）
-   - 是否包含核心创新点
-
-🎯 **输出格式**（JSON）：
-
-\`\`\`json
+返回JSON格式：
 {
   "pageType": "页面类型",
-  "hasImportantFigure": true/false,
-  "figureType": "具体的图表类型（如：模型架构图、算法流程图、实验结果对比图、注意力机制示意图等）",
-  "figureTitle": "图表标题和编号（如：Figure 1: Model Architecture）",
-  "figureDescription": "详细的图表描述（150-300字，包括：1)图表整体结构 2)关键模块和组件 3)数据流向 4)重要标注 5)核心观点）",
-  "keyPoints": [
-    "关键技术点1（具体、详细）",
-    "关键技术点2（具体、详细）",
-    "关键技术点3（具体、详细）",
-    "..."
-  ],
+  "hasImportantFigure": true或false,
+  "figureType": "具体图表类型",
+  "figureTitle": "图表标题",
+  "figureDescription": "图表详细描述（150-300字）",
+  "figureBbox": {
+    "x": 0.1,
+    "y": 0.2,
+    "width": 0.8,
+    "height": 0.6
+  },
+  "keyPoints": ["关键信息1", "关键信息2"],
   "technicalDepth": "high/medium/low",
-  "containsCoreTech": true/false
+  "containsCoreTech": true或false
 }
-\`\`\`
 
-⚠️ **重要提示**：
-- 如果页面中有图表，**必须**给出详细描述（至少150字）
-- 图表描述要专业且详细，包含所有可见的关键信息
-- 关键点要具体，不要泛泛而谈
-- 严格按照JSON格式输出
+**关键要求**：
+1. **figureBbox**是图表的边界框，使用相对坐标（0.0-1.0）：
+   - x: 左边距占页面宽度的比例（0=最左，1=最右）
+   - y: 上边距占页面高度的比例（0=最上，1=最下）
+   - width: 图表宽度占页面宽度的比例
+   - height: 图表高度占页面高度的比例
+   
+2. 请仔细观察图表的实际位置，**尽量精确**地标注边界框
+3. 如果图表占据大部分页面，bbox可能是 {"x": 0.05, "y": 0.1, "width": 0.9, "height": 0.8}
+4. 如果图表在页面中部，bbox可能是 {"x": 0.1, "y": 0.3, "width": 0.8, "height": 0.4}
 
-现在开始分析：`
+5. figureDescription只描述图表本身（不包括周围文字）
+
+立即分析并返回JSON：`
       }
     ];
 
@@ -173,17 +224,33 @@ class PDFVisionService {
         // 如果成功，跳出重试循环
         lastError = null;
 
+        // 确保result是字符串
+        const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
+        console.log(`   响应类型: ${typeof result}, 长度: ${resultStr.length}字`);
+        
+        // 调试：输出前200字符
+        if (resultStr.length < 500) {
+          console.log(`   响应内容: ${resultStr.substring(0, 200)}`);
+        }
+
         // 尝试解析JSON
         try {
+          let jsonStr = null;
+          
           // 先尝试提取JSON代码块
-          let jsonMatch = result.match(/```json\s*([\s\S]*?)\s*```/);
-          if (!jsonMatch) {
+          let jsonMatch = resultStr.match(/```json\s*([\s\S]*?)\s*```/);
+          if (jsonMatch && jsonMatch[1]) {
+            jsonStr = jsonMatch[1].trim();
+          } else {
             // 如果没有代码块，直接匹配JSON对象
-            jsonMatch = result.match(/\{[\s\S]*\}/);
+            jsonMatch = resultStr.match(/(\{[\s\S]*\})/);
+            if (jsonMatch && jsonMatch[1]) {
+              jsonStr = jsonMatch[1].trim();
+            }
           }
           
-          if (jsonMatch) {
-            const jsonStr = jsonMatch[1] || jsonMatch[0];
+          if (jsonStr) {
+            console.log(`   尝试解析JSON (前100字符): ${jsonStr.substring(0, 100)}`);
             const parsed = JSON.parse(jsonStr);
             
             // 确保所有必要字段都存在
@@ -193,10 +260,11 @@ class PDFVisionService {
               figureType: parsed.figureType || '',
               figureTitle: parsed.figureTitle || '',
               figureDescription: parsed.figureDescription || '',
+              figureBbox: parsed.figureBbox || null,  // 新增：图表边界框
               keyPoints: parsed.keyPoints || [],
               technicalDepth: parsed.technicalDepth || 'medium',
               containsCoreTech: parsed.containsCoreTech || false,
-              rawAnalysis: result
+              rawAnalysis: resultStr
             };
           }
         } catch (e) {
@@ -208,7 +276,7 @@ class PDFVisionService {
         return {
           pageType: 'unknown',
           hasImportantFigure: false,
-          rawAnalysis: result,
+          rawAnalysis: resultStr,
           keyPoints: []
         };
 
@@ -266,9 +334,89 @@ class PDFVisionService {
   }
 
   /**
-   * 从分析结果中提取关键图表
+   * 裁剪图表
+   * @param {Array} images - Base64图片数组
+   * @param {Array} analysisResults - 视觉分析结果（包含bbox）
+   * @returns {Promise<Array>} 裁剪后的图片数组
    */
-  extractKeyFigures(analysisResults, images) {
+  async cropFigures(images, analysisResults) {
+    console.log('✂️  裁剪关键图表...');
+    
+    const { spawn } = require('child_process');
+    const path = require('path');
+    
+    // 准备输入数据
+    const inputData = {
+      images: analysisResults.map((analysis, index) => ({
+        index,
+        base64: images[index],
+        bbox: analysis.figureBbox
+      }))
+    };
+    
+    return new Promise((resolve, reject) => {
+      const pythonScript = path.join(__dirname, '../scripts/crop_figures.py');
+      const python = spawn('python3', [pythonScript]);
+      
+      let stdout = '';
+      let stderr = '';
+      
+      python.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+      
+      python.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+      
+      python.on('close', (code) => {
+        if (code !== 0) {
+          console.error('⚠️  图表裁剪失败，使用原图:', stderr);
+          // 失败时返回原图
+          resolve(images);
+        } else {
+          try {
+            const result = JSON.parse(stdout);
+            if (result.success) {
+              const croppedImages = result.croppedImages
+                .sort((a, b) => a.index - b.index)
+                .map(img => img.base64);
+              
+              const croppedCount = result.croppedImages.filter(img => img.cropped).length;
+              console.log(`✅ 成功裁剪 ${croppedCount}/${images.length} 张图片`);
+              
+              resolve(croppedImages);
+            } else {
+              console.error('⚠️  裁剪返回失败，使用原图:', result.error);
+              resolve(images);
+            }
+          } catch (e) {
+            console.error('⚠️  解析裁剪结果失败，使用原图:', e.message);
+            resolve(images);
+          }
+        }
+      });
+      
+      // 发送输入数据
+      python.stdin.write(JSON.stringify(inputData));
+      python.stdin.end();
+      
+      // 超时保护（30秒）
+      setTimeout(() => {
+        python.kill();
+        console.error('⚠️  裁剪超时，使用原图');
+        resolve(images);
+      }, 30000);
+    });
+  }
+
+  /**
+   * 从分析结果中提取关键图表
+   * @param {Array} analysisResults - 视觉分析结果
+   * @param {Array} images - Base64图片数据（用于降级）
+   * @param {Array} imageUrls - OSS图片URL（优先使用）
+   */
+  extractKeyFigures(analysisResults, images, imageUrls = []) {
     console.log('🖼️  提取关键图表...');
 
     const keyFigures = [];
@@ -281,7 +429,8 @@ class PDFVisionService {
         if (description.length >= 80) {
           keyFigures.push({
             pageNumber: index + 1,
-            imageBase64: images[index],
+            imageBase64: images[index], // 保留base64作为降级选项
+            imageUrl: imageUrls[index] || null, // OSS URL（优先使用）
             figureType: analysis.figureType || '图表',
             figureTitle: analysis.figureTitle || `第${index + 1}页图表`,
             description: description,
@@ -329,8 +478,8 @@ class PDFVisionService {
       console.log('\n📄 阶段1: 转换PDF为图片...');
       
       const pdfResult = await this.convertPdfToImages(paper.pdfUrl || paper.pdf_url, {
-        maxPages: mode === 'deep' ? 10 : 5,
-        dpi: mode === 'deep' ? 200 : 150
+        maxPages: 999,  // 不限制页数，读取完整论文
+        dpi: 150        // 统一使用150 DPI
       });
 
       if (!pdfResult.images || pdfResult.images.length === 0) {
@@ -399,37 +548,66 @@ class PDFVisionService {
 
       sendProgress(60, `✅ 视觉分析完成: ${totalPages}页`, { stage: 'vision' });
 
-      // 阶段3: 提取关键图表 (60-65%)
-      sendProgress(60, '🖼️ 阶段3/4: 提取关键图表...', { stage: 'figures' });
+      // 阶段2.5: 裁剪图表 (60-70%)
+      sendProgress(60, '✂️ 阶段3/5: 裁剪核心图表...', { stage: 'crop' });
+      console.log('\n✂️  阶段2.5: 裁剪核心图表...');
+      
+      const croppedImages = await this.cropFigures(pdfResult.images, analysisResults);
+      
+      sendProgress(65, `✅ 图表裁剪完成`, { stage: 'crop' });
+
+      // 阶段2.6: 上传裁剪后的图片到OSS (65-70%)
+      sendProgress(65, '📤 上传裁剪后的图片...', { stage: 'upload_cropped' });
+      console.log('\n📤 上传裁剪后的图片到OSS...');
+      
+      let croppedImageUrls = [];
+      if (ossService.enabled) {
+        try {
+          croppedImageUrls = await ossService.uploadImages(croppedImages, 'pdf-figures');
+          console.log(`✅ ${croppedImageUrls.length} 张裁剪后的图片已上传`);
+          sendProgress(70, `✅ 裁剪图片上传完成`, { stage: 'upload_cropped' });
+        } catch (error) {
+          console.error('⚠️  裁剪图片上传失败:', error.message);
+          // 降级使用原始整页图片URL
+          croppedImageUrls = imageUrls;
+        }
+      } else {
+        // OSS未启用，使用base64
+        croppedImageUrls = [];
+      }
+
+      // 阶段3: 提取关键图表 (70-75%)
+      sendProgress(70, '🖼️ 阶段4/5: 提取关键图表...', { stage: 'figures' });
       console.log('\n🖼️  阶段3: 提取关键图表...');
       
-      const keyFigures = this.extractKeyFigures(analysisResults, pdfResult.images);
+      // 提取关键图表，使用裁剪后的图片和URL
+      const keyFigures = this.extractKeyFigures(analysisResults, croppedImages, croppedImageUrls);
       
-      sendProgress(65, `✅ 找到${keyFigures.length}个关键图表`, { 
+      sendProgress(75, `✅ 找到${keyFigures.length}个关键图表`, { 
         stage: 'figures', 
         count: keyFigures.length 
       });
 
-      // 清理OSS临时图片（如果使用了OSS）
+      // 注意：OSS图片不立即清理，交由生命周期规则处理（30天后自动删除）
+      // 保留整页图片用于视觉分析，裁剪后的图片用于最终文章展示
       if (uploadedToOSS && imageUrls.length > 0) {
-        // 异步清理，不阻塞主流程
-        ossService.deleteImages(imageUrls).catch(err => {
-          console.error('⚠️  清理OSS图片失败:', err.message);
-        });
+        console.log(`📦 OSS图片已嵌入文章（裁剪版），将在30天后自动清理`);
+        console.log(`   - 整页图片: ${imageUrls.length}张（用于分析）`);
+        console.log(`   - 裁剪图片: ${croppedImageUrls.length}张（用于展示）`);
       }
 
       // 检查是否需要降级（无图片时的纯文字解读）
       const useFallbackMode = keyFigures.length === 0;
       if (useFallbackMode) {
         console.log('\n⚠️  未提取到关键图表，使用纯文字解读');
-        sendProgress(65, '⚠️ 未提取到图表，将生成纯文字解读...', { 
+        sendProgress(75, '⚠️ 未提取到图表，将生成纯文字解读...', { 
           stage: 'fallback',
           warning: true
         });
       }
 
-      // 阶段4: 生成深度解读 (65-95%)
-      sendProgress(65, '📝 阶段4/4: AI生成深度解读...', { stage: 'generate' });
+      // 阶段4: 生成深度解读 (75-95%)
+      sendProgress(75, '📝 阶段5/5: AI生成深度解读...', { stage: 'generate' });
       console.log('\n📝 阶段4: 生成深度解读...');
       
       const deepAnalysisPrompt = useFallbackMode 
@@ -472,12 +650,25 @@ class PDFVisionService {
 
       sendProgress(90, '🖼️ 嵌入图片...', { stage: 'embed' });
 
-      // 替换图片placeholder为实际的base64数据
+      // 替换图片placeholder为实际的图片URL或base64数据
       console.log('\n🖼️  嵌入图片...');
+      let ossUsed = 0;
+      let base64Used = 0;
+      
       keyFigures.forEach((figure, index) => {
         const figNum = index + 1;
         const placeholder = `FIGURE_${figNum}_PLACEHOLDER`;
-        const actualImageData = figure.imageBase64;
+        
+        // 优先使用OSS URL（更轻量），如果没有则使用base64
+        const actualImageData = figure.imageUrl || figure.imageBase64;
+        
+        if (figure.imageUrl) {
+          ossUsed++;
+          console.log(`  图${figNum}: 使用OSS URL (${figure.imageUrl.length}字符)`);
+        } else {
+          base64Used++;
+          console.log(`  图${figNum}: 使用Base64降级 (${figure.imageBase64.length}字符)`);
+        }
         
         content = content.replace(
           new RegExp(placeholder, 'g'),
@@ -485,7 +676,7 @@ class PDFVisionService {
         );
       });
 
-      console.log(`✅ 已嵌入 ${keyFigures.length} 张图片`);
+      console.log(`✅ 已嵌入 ${keyFigures.length} 张图片 (OSS: ${ossUsed}, Base64: ${base64Used})`);
 
       const endTime = Date.now();
       const duration = ((endTime - startTime) / 1000).toFixed(1);
@@ -498,6 +689,20 @@ class PDFVisionService {
       console.log('='.repeat(60));
 
       sendProgress(95, '✅ 分析完成，准备返回结果...', { stage: 'done' });
+
+      // 清理OSS图片（解读完成后删除临时图片）
+      if (uploadedToOSS && imageUrls.length > 0) {
+        sendProgress(97, '🗑️ 清理临时图片...', { stage: 'cleanup' });
+        console.log('\n🗑️  清理OSS临时图片...');
+        try {
+          await ossService.deleteImages(imageUrls.concat(croppedImageUrls || []));
+          console.log(`✅ 已删除 ${imageUrls.length + (croppedImageUrls?.length || 0)} 张临时图片`);
+        } catch (error) {
+          console.warn('⚠️  清理OSS图片失败（不影响主流程）:', error.message);
+        }
+      }
+
+      sendProgress(100, '✅ 所有任务完成！', { stage: 'done' });
 
       return {
         content,
@@ -540,8 +745,8 @@ class PDFVisionService {
       // 阶段1: 转换PDF为图片
       console.log('\n📄 阶段1: 转换PDF为图片...');
       const pdfResult = await this.convertPdfToImages(paper.pdfUrl || paper.pdf_url, {
-        maxPages: mode === 'deep' ? 10 : 5,
-        dpi: mode === 'deep' ? 200 : 150
+        maxPages: 999,  // 不限制页数，读取完整论文
+        dpi: 150        // 统一使用150 DPI
       });
 
       if (!pdfResult.images || pdfResult.images.length === 0) {
@@ -701,8 +906,26 @@ ${paper.abstract || paper.summary || '暂无摘要'}
   /**
    * 构建深度分析Prompt
    */
-  buildDeepAnalysisPrompt(paper, analysisResults, keyFigures) {
-    let prompt = `你是一位资深的AI研究专家，擅长撰写深入浅出的技术解读文章。请基于以下信息，撰写一篇3000-4000字的高质量论文深度解读：
+  buildDeepAnalysisPrompt(paper, analysisResults, keyFigures, styleConfig = null) {
+    // 获取随机风格（如果未提供）
+    if (!styleConfig) {
+      styleConfig = this.getRandomStyle();
+    }
+    
+    const { style, format } = styleConfig;
+    
+    let prompt = `你是一位资深的AI研究专家，擅长撰写深入浅出的技术解读文章。
+
+🎨 本次解读风格: ${style.name}
+- 语调: ${style.tone}
+- 结构: ${style.structure}
+- 语言: ${style.language}
+
+📋 本次解读格式: ${format.name}
+- 章节结构: ${format.sections.join(' → ')}
+- 写作重点: ${format.emphasis}
+
+请严格按照以上风格和格式，基于以下信息，撰写一篇3000-5000字的高质量论文深度解读：
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📄 论文基本信息
@@ -770,8 +993,8 @@ ${paper.abstract || paper.summary || '暂无摘要'}
         prompt += `**【图${figNum}】${figure.figureType}** (PDF第${figure.pageNumber}页)\n\n`;
         prompt += `${figure.description}\n\n`;
         
-        // 提供图片的引用格式
-        prompt += `**在文章中请使用**: \`![${figure.figureType}](data:image/jpeg;base64,FIGURE_${figNum}_PLACEHOLDER)\`\n\n`;
+        // 提供图片的引用格式（placeholder将被替换为完整的data URI）
+        prompt += `**在文章中请使用**: \`![${figure.figureType}](FIGURE_${figNum}_PLACEHOLDER)\`\n\n`;
         prompt += `---\n\n`;
       });
     }
@@ -804,8 +1027,11 @@ ${keyFigures.find(f => f.figureType && (
   f.figureType.toLowerCase().includes('architecture') ||
   f.figureType.toLowerCase().includes('model')
 )) ? 
-`- **关键**：在此处嵌入模型架构图，使用上面提供的图片引用格式
-- 配图说明：详细解读架构图中的每个模块和数据流\n` : ''}
+`- **图片嵌入要求**：
+  * 在介绍完核心创新点的文字说明后
+  * 立即插入模型架构图
+  * 图片后紧跟200-300字的架构图解读
+  * 解读要点：各模块功能、数据流向、创新设计\n` : ''}
 - 使用类比或比喻帮助理解复杂概念
 
 **示例代码块**（如果适用）:
@@ -827,8 +1053,11 @@ ${keyFigures.find(f => f.figureType && (
   f.figureType.toLowerCase().includes('flow') ||
   f.figureType.toLowerCase().includes('pipeline')
 )) ? 
-`- **关键**：在此处嵌入算法流程图，使用上面提供的图片引用格式
-- 配图说明：逐步解读流程图中的每个环节\n` : ''}
+`- **图片嵌入要求**：
+  * 在描述完技术流程的文字说明后
+  * 立即插入算法流程图/流程图
+  * 图片后紧跟200-300字的流程图解读
+  * 解读要点：逐步说明每个环节、数据变换、关键步骤\n` : ''}
 - **参数设置**和**超参数调优策略**
 - **实现难点**和**解决方案**
 - 与baseline方法的**技术对比表格**
@@ -852,8 +1081,11 @@ ${keyFigures.find(f => f.figureType && (
   f.figureType.toLowerCase().includes('result') ||
   f.figureType.toLowerCase().includes('performance')
 )) ? 
-`- **关键**：在此处嵌入实验结果图，使用上面提供的图片引用格式
-- 配图说明：详细分析图表中的数据趋势和关键指标\n` : ''}
+`- **图片嵌入要求**：
+  * 在说明实验设置和对比方法后
+  * 立即插入实验结果图/性能对比图
+  * 图片后紧跟200-300字的结果图解读
+  * 解读要点：数据趋势、性能提升幅度、关键指标对比、异常值分析\n` : ''}
 - **结果分析**：为什么能达到这样的效果？
 - **可视化案例**：展示具体的预测/生成结果
 
@@ -896,15 +1128,34 @@ ${keyFigures.find(f => f.figureType && (
    - 每个技术点都要展开详细说明
    - 使用数学公式、代码、图表辅助说明
 
-2. **图文并茂（关键）**：
-   - **必须**在合适位置嵌入上面提供的所有关键图表（${keyFigures.length}张）
-   - 图片格式：![图表描述](data:image/jpeg;base64,FIGURE_X_PLACEHOLDER)
+2. **图文并茂（核心要求）**：
+   
+   **图片嵌入原则**（参考腾讯元宝深度阅读模式）：
+   - **必须**将所有关键图表（${keyFigures.length}张）嵌入到**对应的技术说明段落中**
+   - **不要**把所有图片堆在一起，而要**分散嵌入**到相关章节
+   - 图片格式：![图表描述](FIGURE_X_PLACEHOLDER)
+   
+   **嵌入时机**（非常重要）：
+   - 在说明某个技术点/方法/结果**之后**，立即插入对应的图片
    - 图片前后必须空行，单独成段
-   - 每张图后必须跟200-300字的详细解读，包括：
-     * 图表展示的核心内容
-     * 关键技术点的视觉化说明
-     * 与文字内容的呼应
-   - 示例：图片单独成段，后面跟详细解读文字
+   - 图片之后跟200-300字的**图片解读段落**
+   
+   **图片解读段落必须包含**：
+   - "图中展示了..." 开头说明图片内容
+   - 解读图中的关键模块/组件/数据
+   - 指出图中的亮点和重要细节
+   - 与前文的技术说明相呼应
+   
+   **示例格式**：
+   \`\`\`markdown
+   ...（技术说明文字）...
+   
+   ![Transformer架构图](FIGURE_1_PLACEHOLDER)
+   
+   图中展示了完整的Transformer模型架构。可以看到，模型分为编码器和解码器两部分...（200-300字详细解读）
+   
+   ...（继续后续内容）...
+   \`\`\`
 
 3. **专业但易懂**：
    - 使用类比和例子帮助理解

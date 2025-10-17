@@ -1,5 +1,6 @@
 const express = require('express');
 const arxivService = require('../services/arxivService');
+const paperCrawlerService = require('../services/paperCrawlerService');
 
 const router = express.Router();
 
@@ -106,6 +107,135 @@ router.post('/papers/refresh', async (req, res) => {
     res.status(500).json({
       success: false,
       message: '清除缓存失败'
+    });
+  }
+});
+
+/**
+ * POST /api/papers/crawl
+ * 综合爬取：从多个渠道获取最新热门论文
+ * Body: { reddit: true, papersWithCode: true, huggingface: true, twitter: false, limit: 20 }
+ */
+router.post('/papers/crawl', async (req, res) => {
+  try {
+    const {
+      useArxiv = true,  // 默认使用arXiv（最稳定）
+      reddit = false,
+      papersWithCode = false,
+      huggingface = false,
+      twitter = false,
+      limit = 30
+    } = req.body;
+
+    console.log('🚀 开始爬取论文...');
+    
+    let totalPapers = 0;
+    let sources = {
+      arxiv: 0,
+      reddit: 0,
+      papersWithCode: 0,
+      huggingface: 0,
+      twitter: 0
+    };
+
+    // 方案1：使用arXiv（推荐，最稳定）
+    if (useArxiv) {
+      console.log('📡 从arXiv获取论文（推荐方式）...');
+      try {
+        // 获取更多分类的论文
+        const categories = ['cs.AI', 'cs.LG', 'cs.CV', 'cs.CL', 'cs.NE', 'cs.RO'];
+        const arxivPapers = await arxivService.fetchMultiCategoryPapers(categories, limit, true);
+        
+        if (arxivPapers && arxivPapers.length > 0) {
+          totalPapers += arxivPapers.length;
+          sources.arxiv = arxivPapers.length;
+          console.log(`✅ arXiv: ${arxivPapers.length} 篇`);
+        }
+      } catch (error) {
+        console.error('⚠️  arXiv爬取失败:', error.message);
+      }
+    }
+
+    // 方案2：尝试其他渠道（可选，可能超时）
+    if (reddit || papersWithCode || huggingface || twitter) {
+      console.log('📡 尝试从其他渠道获取论文...');
+      try {
+        const result = await paperCrawlerService.crawlAllSources({
+          reddit,
+          papersWithCode,
+          huggingface,
+          twitter,
+          limit: 10  // 限制数量以避免超时
+        });
+        
+        if (result.success && result.total > 0) {
+          totalPapers += result.total;
+          sources.reddit += result.sources.reddit || 0;
+          sources.papersWithCode += result.sources.papersWithCode || 0;
+          sources.huggingface += result.sources.huggingface || 0;
+          sources.twitter += result.sources.twitter || 0;
+          console.log(`✅ 其他渠道: ${result.total} 篇`);
+        }
+      } catch (error) {
+        console.error('⚠️  其他渠道爬取失败（不影响主流程）:', error.message);
+      }
+    }
+
+    res.json({
+      success: totalPapers > 0,
+      message: totalPapers > 0 
+        ? `成功爬取 ${totalPapers} 篇论文，已保存到数据库`
+        : '未能爬取到论文，外部API可能不可用',
+      total: totalPapers,
+      sources: sources,
+      tip: totalPapers === 0 
+        ? '建议使用"刷新"按钮（🔄）从arXiv获取论文，这是最稳定的方式'
+        : '论文已自动保存到数据库，刷新页面查看'
+    });
+  } catch (error) {
+    console.error('Error crawling papers:', error);
+    res.status(500).json({
+      success: false,
+      message: '爬取论文失败',
+      error: process.env.NODE_ENV === 'development' ? error.message : '服务器错误',
+      tip: '建议使用"刷新"按钮（🔄）从arXiv获取论文'
+    });
+  }
+});
+
+/**
+ * GET /api/papers/crawl-status
+ * 获取爬虫状态信息
+ */
+router.get('/papers/crawl-status', async (req, res) => {
+  try {
+    const Paper = require('../models/Paper');
+    
+    const total = await Paper.countDocuments({ status: 'active' });
+    const trending = await Paper.countDocuments({ status: 'active', trending: true });
+    const lastFetched = await Paper.findOne({ status: 'active' })
+      .sort({ fetchedAt: -1 })
+      .select('fetchedAt');
+
+    res.json({
+      success: true,
+      status: {
+        totalPapers: total,
+        trendingPapers: trending,
+        lastFetched: lastFetched ? lastFetched.fetchedAt : null,
+        sources: {
+          reddit: process.env.REDDIT_CRAWLER_ENABLED !== 'false',
+          papersWithCode: process.env.PWC_CRAWLER_ENABLED !== 'false',
+          huggingface: process.env.HF_CRAWLER_ENABLED !== 'false',
+          twitter: !!process.env.TWITTER_BEARER_TOKEN
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error getting crawl status:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取状态失败'
     });
   }
 });
