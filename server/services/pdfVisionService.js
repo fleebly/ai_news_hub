@@ -2,6 +2,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 const axios = require('axios');
 const fs = require('fs').promises;
+const ossService = require('./ossService');
 
 /**
  * PDF视觉分析服务
@@ -69,9 +70,17 @@ class PDFVisionService {
 
   /**
    * 使用qwen-vl-plus分析单页PDF图片
+   * @param {string} imageData - 图片URL(推荐)或base64数据
+   * @param {number} pageNumber - 页码
+   * @param {object} aliyunService - 阿里云服务实例
    */
-  async analyzePageWithVision(imageBase64, pageNumber, aliyunService) {
+  async analyzePageWithVision(imageData, pageNumber, aliyunService) {
     console.log(`👁️  分析第 ${pageNumber} 页...`);
+    
+    const isUrl = imageData.startsWith('http://') || imageData.startsWith('https://');
+    if (isUrl) {
+      console.log(`   使用OSS URL: ${imageData.substring(0, 80)}...`);
+    }
 
     const messages = [
       {
@@ -148,11 +157,13 @@ class PDFVisionService {
         }
 
         // 使用aliyunBailianService的chatWithVision方法
-        // imageBase64实际上是完整的data URI（来自Python脚本）
-        // aliyunBailianService会自动提取纯base64部分传给API
+        // imageData可以是：
+        // 1. OSS URL（推荐）- 阿里云视觉API直接访问
+        // 2. data URI - service会自动提取纯base64（但API可能拒绝）
+        // 3. 纯base64 - service直接使用（但API可能拒绝）
         const result = await aliyunService.chatWithVision(
           messages,
-          imageBase64,  // 传递完整data URI，service会自动处理
+          imageData,  // 传递URL或base64数据
           {
             model: 'qwen-vl-plus',
             maxTokens: 3000  // 增加token限制，支持更详细的分析
@@ -331,8 +342,30 @@ class PDFVisionService {
         pages: pdfResult.images.length 
       });
 
-      // 阶段2: 视觉模型分析 (20-60%)
-      sendProgress(20, '👁️ 阶段2/4: AI视觉分析中...', { stage: 'vision' });
+      // 阶段1.5: 上传图片到OSS (20-25%)
+      sendProgress(20, '📤 上传图片到云端...', { stage: 'upload' });
+      console.log('\n📤 上传图片到OSS...');
+      
+      let imageUrls = [];
+      let uploadedToOSS = false;
+      
+      if (ossService.enabled) {
+        try {
+          imageUrls = await ossService.uploadImages(pdfResult.images);
+          uploadedToOSS = true;
+          console.log(`✅ ${imageUrls.length} 张图片已上传到OSS`);
+          sendProgress(25, `✅ 图片上传完成`, { stage: 'upload' });
+        } catch (error) {
+          console.error('⚠️  OSS上传失败，将使用降级模式:', error.message);
+          imageUrls = pdfResult.images; // 降级：使用原始base64
+        }
+      } else {
+        console.log('⚠️  OSS未配置，无法使用视觉分析');
+        throw new Error('OSS服务未配置，无法进行视觉分析。请配置ALIYUN_OSS相关环境变量。');
+      }
+
+      // 阶段2: 视觉模型分析 (25-60%)
+      sendProgress(25, '👁️ 阶段2/4: AI视觉分析中...', { stage: 'vision' });
       console.log('\n👁️  阶段2: 视觉模型分析...');
       
       const totalPages = pdfResult.images.length;
@@ -341,7 +374,7 @@ class PDFVisionService {
       // 分批并行处理，每批发送进度（提高并发度到4）
       const concurrency = 4;
       for (let i = 0; i < totalPages; i += concurrency) {
-        const batch = pdfResult.images.slice(i, i + concurrency);
+        const batch = imageUrls.slice(i, i + concurrency);
         const batchNum = Math.floor(i / concurrency) + 1;
         const totalBatches = Math.ceil(totalPages / concurrency);
         
@@ -377,11 +410,19 @@ class PDFVisionService {
         count: keyFigures.length 
       });
 
+      // 清理OSS临时图片（如果使用了OSS）
+      if (uploadedToOSS && imageUrls.length > 0) {
+        // 异步清理，不阻塞主流程
+        ossService.deleteImages(imageUrls).catch(err => {
+          console.error('⚠️  清理OSS图片失败:', err.message);
+        });
+      }
+
       // 检查是否需要降级（无图片时的纯文字解读）
       const useFallbackMode = keyFigures.length === 0;
       if (useFallbackMode) {
-        console.log('\n⚠️  视觉分析失败，使用降级模式（纯文字解读）');
-        sendProgress(65, '⚠️ 视觉分析失败，将生成纯文字解读...', { 
+        console.log('\n⚠️  未提取到关键图表，使用纯文字解读');
+        sendProgress(65, '⚠️ 未提取到图表，将生成纯文字解读...', { 
           stage: 'fallback',
           warning: true
         });
