@@ -389,7 +389,7 @@ class PDFVisionService {
           }
         ],
         {
-          maxTokens: 10000, // 增加token限制以支持更长的高质量文章
+          maxTokens: 8000, // 阿里云模型最大支持8192，这里设置8000以留出余量
           model: 'qwen-max',
           temperature: 0.6 // 降低温度以提高输出的稳定性和准确性
         }
