@@ -87,13 +87,27 @@ class AliyunBailianService {
     }
 
     try {
-      // 判断是base64还是URL
-      const isBase64 = imageDataOrUrl.startsWith('data:image/') || 
-                      (imageDataOrUrl.length > 1000 && !imageDataOrUrl.startsWith('http'));
+      // 判断输入类型并转换为阿里云API要求的格式
+      let imageData;
       
-      const imageData = isBase64 ? imageDataOrUrl : 
-                       (imageDataOrUrl.startsWith('data:image/') ? imageDataOrUrl : 
-                       `https://dashscope-result.oss-cn-beijing.aliyuncs.com/${imageDataOrUrl}`);
+      if (imageDataOrUrl.startsWith('http://') || imageDataOrUrl.startsWith('https://')) {
+        // URL格式：直接使用
+        imageData = imageDataOrUrl;
+      } else if (imageDataOrUrl.startsWith('data:image/')) {
+        // data URI格式：提取纯base64部分
+        const base64Match = imageDataOrUrl.match(/^data:image\/[^;]+;base64,(.+)$/);
+        if (base64Match && base64Match[1]) {
+          imageData = base64Match[1];
+        } else {
+          throw new Error('无效的data URI格式');
+        }
+      } else if (imageDataOrUrl.length > 100 && !imageDataOrUrl.includes('/')) {
+        // 纯base64字符串：直接使用
+        imageData = imageDataOrUrl;
+      } else {
+        // 其他情况：假定为OSS路径
+        imageData = `https://dashscope-result.oss-cn-beijing.aliyuncs.com/${imageDataOrUrl}`;
+      }
 
       // 构建多模态消息
       const multimodalMessages = messages.map((msg, index) => {
@@ -117,6 +131,11 @@ class AliyunBailianService {
       });
 
       console.log('🔍 使用多模态模型分析图片');
+      console.log(`   图片数据类型: ${imageData.startsWith('http') ? 'URL' : (imageData.startsWith('data:') ? 'data URI' : '纯base64')}`);
+      console.log(`   图片数据长度: ${imageData.length} 字符`);
+      if (!imageData.startsWith('http')) {
+        console.log(`   图片数据前50字符: ${imageData.substring(0, 50)}...`);
+      }
 
       const response = await axios.post(
         `${this.endpoint}/services/aigc/multimodal-generation/generation`,

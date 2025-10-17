@@ -148,11 +148,11 @@ class PDFVisionService {
         }
 
         // 使用aliyunBailianService的chatWithVision方法
-        const imageDataUrl = `data:image/jpeg;base64,${imageBase64}`;
-        
+        // imageBase64实际上是完整的data URI（来自Python脚本）
+        // aliyunBailianService会自动提取纯base64部分传给API
         const result = await aliyunService.chatWithVision(
           messages,
-          imageDataUrl,
+          imageBase64,  // 传递完整data URI，service会自动处理
           {
             model: 'qwen-vl-plus',
             maxTokens: 3000  // 增加token限制，支持更详细的分析
