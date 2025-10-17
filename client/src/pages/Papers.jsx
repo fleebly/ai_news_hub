@@ -36,7 +36,22 @@ import api from '../services/api'
 const MarkdownImage = ({ src, alt, ...props }) => {
   const [imgError, setImgError] = useState(false)
   const [imgLoading, setImgLoading] = useState(true)
-  
+
+  // 验证图片源
+  if (!src || src === '' || src === 'undefined') {
+    return (
+      <div className="my-8 bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-8 text-center border-2 border-dashed border-purple-300 shadow-md">
+        <div className="text-6xl mb-4">🖼️</div>
+        <div className="text-gray-900 font-bold text-xl mb-3">
+          {alt || '图表说明'}
+        </div>
+        <div className="text-gray-600 text-base leading-loose max-w-2xl mx-auto">
+          图片源缺失，请查看PDF原文获取完整图表
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="my-8">
       {!imgError ? (
@@ -52,8 +67,13 @@ const MarkdownImage = ({ src, alt, ...props }) => {
             {...props}
             className={`rounded-xl shadow-2xl w-full transition-opacity duration-500 ${imgLoading ? 'opacity-0' : 'opacity-100'}`}
             onLoad={() => setImgLoading(false)}
-            onError={() => {
-              console.error('图片加载失败:', src?.substring(0, 100))
+            onError={(e) => {
+              console.error('图片加载失败:', {
+                src: src?.substring(0, 100),
+                alt,
+                isBase64: src?.startsWith('data:image'),
+                error: e
+              })
               setImgError(true)
               setImgLoading(false)
             }}
@@ -62,16 +82,16 @@ const MarkdownImage = ({ src, alt, ...props }) => {
       ) : (
         <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl p-8 text-center border-2 border-dashed border-purple-300 shadow-md">
           <div className="text-6xl mb-4">🖼️</div>
-          <p className="text-gray-900 font-bold text-xl mb-3">
+          <div className="text-gray-900 font-bold text-xl mb-3">
             {alt || '图表说明'}
-          </p>
-          <p className="text-gray-600 text-base leading-loose max-w-2xl mx-auto">
+          </div>
+          <div className="text-gray-600 text-base leading-loose max-w-2xl mx-auto">
             图片加载失败，请查看PDF原文获取完整图表
-          </p>
+          </div>
         </div>
       )}
       {alt && !imgError && (
-        <p className="text-center text-base text-gray-600 mt-4 italic leading-relaxed px-4">{alt}</p>
+        <div className="text-center text-base text-gray-600 mt-4 italic leading-relaxed px-4">{alt}</div>
       )}
     </div>
   )
