@@ -49,10 +49,12 @@ def convert_to_images(pdf_content, max_pages=5, dpi=150):
 
 
 def image_to_base64(image, quality=85):
-    """将PIL Image转换为base64"""
+    """将PIL Image转换为完整的data URI"""
     buffered = BytesIO()
     image.save(buffered, format="JPEG", quality=quality, optimize=True)
-    return base64.b64encode(buffered.getvalue()).decode('utf-8')
+    img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
+    # 返回完整的data URI，包含MIME类型前缀
+    return f'data:image/jpeg;base64,{img_str}'
 
 
 def main():
