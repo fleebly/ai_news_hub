@@ -92,14 +92,6 @@ const Papers = () => {
   
   // AI解读相关状态
   const [showAnalysisModal, setShowAnalysisModal] = useState(false)
-  
-  // 调试：监控Modal状态变化
-  useEffect(() => {
-    console.log('📊 showAnalysisModal 状态变化:', showAnalysisModal)
-    if (!showAnalysisModal) {
-      console.trace('❌ Modal被关闭，调用堆栈：')
-    }
-  }, [showAnalysisModal])
   const [selectedPaper, setSelectedPaper] = useState(null)
   const [analysisMode] = useState('deep') // 只保留深度解读
   const [analyzing, setAnalyzing] = useState(false)
@@ -420,26 +412,15 @@ const Papers = () => {
 
   // 打开AI解读Modal
   const openAnalysisModal = (paper) => {
-    console.log('🚀 openAnalysisModal 被调用', paper)
+    setSelectedPaper(paper)
+    setShowAnalysisModal(true)
+    setAnalysisError('')
+    setAnalysisResult(null)
     
-    try {
-      setSelectedPaper(paper)
-      setShowAnalysisModal(true)
-      setAnalysisError('')
-      setAnalysisResult(null)
-      
-      console.log('✅ Modal状态已设置为true')
-      
-      // 检查是否有缓存的结果
-      const cachedResult = getAnalysisFromCache(paper.id, 'standard')
-      if (cachedResult) {
-        console.log('✅ 找到缓存的解读内容')
-        setAnalysisResult(cachedResult)
-      } else {
-        console.log('ℹ️ 未找到缓存，需要重新分析')
-      }
-    } catch (error) {
-      console.error('❌ openAnalysisModal 出错:', error)
+    // 检查是否有缓存的结果
+    const cachedResult = getAnalysisFromCache(paper.id, 'standard')
+    if (cachedResult) {
+      setAnalysisResult(cachedResult)
     }
   }
 
@@ -456,7 +437,6 @@ const Papers = () => {
     if (!forceRefresh) {
       const cachedResult = getAnalysisFromCache(paper.id, 'standard')
       if (cachedResult) {
-        console.log('✅ 使用缓存的解读内容')
         setAnalysisResult(cachedResult)
         setAnalyzing(false)
         setAnalysisProgress(100)
@@ -464,8 +444,6 @@ const Papers = () => {
         setAnalysisLogs(['✅ 从缓存加载结果'])
         return
       }
-    } else {
-      console.log('🔄 强制重新解读，跳过缓存')
     }
 
     // 没有缓存或强制刷新，发起请求
@@ -763,20 +741,6 @@ const Papers = () => {
             
             {/* Filters */}
             <div className="flex items-center space-x-6">
-              {/* 调试测试按钮 */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  console.log('🧪 测试按钮被点击')
-                  setSelectedPaper(filteredPapers[0] || mockPapers[0])
-                  setShowAnalysisModal(true)
-                  console.log('✅ 已设置 showAnalysisModal = true')
-                }}
-                className="px-3 py-1 text-sm rounded-lg font-medium bg-red-100 text-red-800 border-2 border-red-300 hover:bg-red-200"
-              >
-                🧪 测试Modal
-              </button>
-              
               <label className="flex items-center cursor-pointer">
                 <input
                   type="checkbox"
@@ -962,9 +926,7 @@ const Papers = () => {
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
           onClick={(e) => {
-            // 点击背景关闭Modal
             if (e.target === e.currentTarget) {
-              console.log('🚀 点击背景关闭Modal')
               setShowAnalysisModal(false)
             }
           }}
