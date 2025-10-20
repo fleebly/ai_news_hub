@@ -497,28 +497,15 @@ class PDFVisionService {
       
       let imageUrls = [];
       let uploadedToOSS = false;
-      let useBase64Fallback = false;
       
-      if (ossService.enabled) {
-        try {
-          imageUrls = await ossService.uploadImages(pdfResult.images);
-          uploadedToOSS = true;
-          console.log(`✅ ${imageUrls.length} 张图片已上传到OSS`);
-          sendProgress(25, `✅ 图片上传完成`, { stage: 'upload' });
-        } catch (error) {
-          console.error('⚠️  OSS上传失败:', error.message);
-          console.log('📋 降级方案：使用Base64编码（会占用更多token，但功能完整）');
-          useBase64Fallback = true;
-          // 为base64添加data URI前缀，供视觉模型使用
-          imageUrls = pdfResult.images.map(base64 => `data:image/jpeg;base64,${base64}`);
-          sendProgress(25, `⚠️ OSS失败，使用Base64模式`, { stage: 'upload', fallback: true });
-        }
-      } else {
-        console.log('⚠️  OSS未配置，使用Base64降级模式');
-        useBase64Fallback = true;
-        imageUrls = pdfResult.images.map(base64 => `data:image/jpeg;base64,${base64}`);
-        sendProgress(25, `⚠️ 使用Base64模式`, { stage: 'upload', fallback: true });
+      if (!ossService.enabled) {
+        throw new Error('OSS服务未配置，无法进行视觉分析。请配置ALIYUN_OSS相关环境变量。');
       }
+      
+      imageUrls = await ossService.uploadImages(pdfResult.images);
+      uploadedToOSS = true;
+      console.log(`✅ ${imageUrls.length} 张图片已上传到OSS`);
+      sendProgress(25, `✅ 图片上传完成`, { stage: 'upload' });
 
       // 阶段2: 视觉模型分析 (25-60%)
       sendProgress(25, '👁️ 阶段2/4: AI视觉分析中...', { stage: 'vision' });
@@ -567,26 +554,9 @@ class PDFVisionService {
       sendProgress(65, '📤 上传裁剪后的图片...', { stage: 'upload_cropped' });
       console.log('\n📤 上传裁剪后的图片到OSS...');
       
-      let croppedImageUrls = [];
-      if (ossService.enabled && !useBase64Fallback) {
-        try {
-          croppedImageUrls = await ossService.uploadImages(croppedImages, 'pdf-figures');
-          console.log(`✅ ${croppedImageUrls.length} 张裁剪后的图片已上传`);
-          sendProgress(70, `✅ 裁剪图片上传完成`, { stage: 'upload_cropped' });
-        } catch (error) {
-          console.error('⚠️  裁剪图片上传失败:', error.message);
-          console.log('📋 降级：使用Base64编码');
-          // 降级使用Base64
-          croppedImageUrls = croppedImages.map(base64 => `data:image/jpeg;base64,${base64}`);
-          useBase64Fallback = true;
-          sendProgress(70, `⚠️ 使用Base64模式`, { stage: 'upload_cropped', fallback: true });
-        }
-      } else {
-        // OSS未启用或已经在降级模式，使用base64
-        console.log('📋 使用Base64编码（降级模式）');
-        croppedImageUrls = croppedImages.map(base64 => `data:image/jpeg;base64,${base64}`);
-        sendProgress(70, `⚠️ Base64模式`, { stage: 'upload_cropped', fallback: true });
-      }
+      const croppedImageUrls = await ossService.uploadImages(croppedImages, 'pdf-figures');
+      console.log(`✅ ${croppedImageUrls.length} 张裁剪后的图片已上传`);
+      sendProgress(70, `✅ 裁剪图片上传完成`, { stage: 'upload_cropped' });
 
       // 阶段3: 提取关键图表 (70-75%)
       sendProgress(70, '🖼️ 阶段4/5: 提取关键图表...', { stage: 'figures' });
@@ -703,7 +673,7 @@ class PDFVisionService {
       sendProgress(95, '✅ 分析完成，准备返回结果...', { stage: 'done' });
 
       // 清理OSS图片（解读完成后删除临时图片）
-      if (uploadedToOSS && !useBase64Fallback && imageUrls.length > 0) {
+      if (uploadedToOSS && imageUrls.length > 0) {
         sendProgress(97, '🗑️ 清理临时图片...', { stage: 'cleanup' });
         console.log('\n🗑️  清理OSS临时图片...');
         try {
@@ -712,8 +682,6 @@ class PDFVisionService {
         } catch (error) {
           console.warn('⚠️  清理OSS图片失败（不影响主流程）:', error.message);
         }
-      } else if (useBase64Fallback) {
-        console.log('📋 Base64模式：无需清理OSS图片');
       }
 
       sendProgress(100, '✅ 所有任务完成！', { stage: 'done' });
