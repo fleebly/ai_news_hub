@@ -743,12 +743,14 @@ class PDFVisionService {
         content,
         keyFigures,
         analysisResults,
+        croppedImageUrls,  // 添加裁剪后的图片URL数组
         metadata: {
           pagesAnalyzed: pdfResult.images.length,
           figuresFound: keyFigures.length,
           duration: duration,
           mode: mode,
-          contentLength: content.length
+          contentLength: content.length,
+          uploadedToOSS: uploadedToOSS
         }
       };
 
