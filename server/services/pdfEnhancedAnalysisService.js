@@ -536,10 +536,18 @@ ${blogSection || '暂无'}
       let visionAnalysis = null;
       try {
         console.log('\n📄 开始PDF图表提取...');
-        visionAnalysis = await pdfVisionService.hybridAnalysisWithProgress(
-          pdfUrl,
+        
+        // 构建paper对象（符合pdfVisionService的预期格式）
+        const paperForVision = {
           title,
-          abstract || '',
+          abstract: abstract || '',
+          pdfUrl: pdfUrl
+        };
+        
+        visionAnalysis = await pdfVisionService.hybridAnalysisWithProgress(
+          paperForVision,
+          null, // aliyunService参数，内部会自动导入
+          'standard', // mode参数
           (progress, message, details) => {
             // 映射进度到10-40%范围
             const mappedProgress = 10 + (progress * 0.3);
