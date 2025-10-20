@@ -32,8 +32,15 @@ def download_pdf(url, timeout=30):
         raise Exception(f"下载PDF失败: {str(e)}")
 
 
-def convert_to_images(pdf_content, max_pages=5, dpi=150):
-    """将PDF转换为图片"""
+def convert_to_images(pdf_content, max_pages=5, dpi=250):
+    """
+    将PDF转换为高分辨率图片
+    
+    Args:
+        pdf_content: PDF文件内容
+        max_pages: 最大页数
+        dpi: 分辨率（默认250，提供更清晰的图片）
+    """
     try:
         images = convert_from_bytes(
             pdf_content,
@@ -48,8 +55,14 @@ def convert_to_images(pdf_content, max_pages=5, dpi=150):
         raise Exception(f"转换PDF失败: {str(e)}")
 
 
-def image_to_base64(image, quality=85):
-    """将PIL Image转换为完整的data URI"""
+def image_to_base64(image, quality=95):
+    """
+    将PIL Image转换为完整的data URI（高质量）
+    
+    Args:
+        image: PIL Image对象
+        quality: JPEG质量（默认95，提供更清晰的图片）
+    """
     buffered = BytesIO()
     image.save(buffered, format="JPEG", quality=quality, optimize=True)
     img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
