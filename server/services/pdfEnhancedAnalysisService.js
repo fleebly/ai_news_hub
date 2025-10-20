@@ -546,7 +546,7 @@ ${blogSection || '暂无'}
         
         visionAnalysis = await pdfVisionService.hybridAnalysisWithProgress(
           paperForVision,
-          null, // aliyunService参数，内部会自动导入
+          aliyunBailianService, // 传递aliyunBailianService实例
           'standard', // mode参数
           (progress, message, details) => {
             // 映射进度到10-40%范围
