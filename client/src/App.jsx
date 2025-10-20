@@ -12,7 +12,7 @@ import TestQuestion from './pages/TestQuestion'
 import NewsDetail from './pages/NewsDetail'
 import Papers from './pages/Papers'
 import Blogs from './pages/Blogs'
-import Reviews from './pages/Reviews'
+// import Reviews from './pages/Reviews'  // 已集成到Papers的深度解读模式
 import Learning from './pages/Learning'
 // import Wechat from './pages/Wechat'
 // import WechatDetail from './pages/WechatDetail'
@@ -71,10 +71,11 @@ function App() {
             path="/blogs" 
             element={<Blogs />} 
           />
-          <Route 
+          {/* 综述功能已集成到Papers的深度解读模式 */}
+          {/* <Route 
             path="/reviews" 
             element={<Reviews />} 
-          />
+          /> */}
           <Route 
             path="/learning" 
             element={<Learning />} 

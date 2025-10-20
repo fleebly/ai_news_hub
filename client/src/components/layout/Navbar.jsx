@@ -28,10 +28,10 @@ const Navbar = () => {
     { name: '首页', href: '/', icon: Home },
     { name: '资讯', href: '/news', icon: Newspaper },
     { name: '论文', href: '/papers', icon: FileText },
-    { name: '综述', href: '/reviews', icon: BookOpen },
     { name: '学习', href: '/learning', icon: Brain },
-    { name: '博客', href: '/blogs', icon: FileText },
+    { name: '博客', href: '/blogs', icon: BookOpen },
     // { name: 'AI解读', href: '/paper-analysis', icon: Sparkles },  // 已集成到论文页面
+    // { name: '综述', href: '/reviews', icon: BookOpen },  // 已集成到论文解读
     // { name: '微信公众号', href: '/wechat', icon: MessageCircle },
     { name: '开源', href: '/opensource', icon: Github },
     { name: '编程', href: '/questions', icon: Code2 },

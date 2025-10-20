@@ -3,6 +3,7 @@ const router = express.Router();
 const aliyunBailianService = require('../services/aliyunBailianService');
 const arxivService = require('../services/arxivService');
 const pdfVisionService = require('../services/pdfVisionService');
+const pdfEnhancedAnalysisService = require('../services/pdfEnhancedAnalysisService');
 
 /**
  * 论文解读和博客生成路由
@@ -461,6 +462,70 @@ router.post('/analyze-hybrid', async (req, res) => {
         fallbackError: fallbackError.message
       });
     }
+  }
+});
+
+/**
+ * POST /api/paper-analysis/analyze-enhanced-stream
+ * 增强分析（SSE流式）- 整合多源搜索
+ */
+router.post('/analyze-enhanced-stream', async (req, res) => {
+  // 设置SSE响应头
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  const sendEvent = (data) => {
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
+  const sendProgress = (progress, message, details = {}) => {
+    sendEvent({ type: 'progress', progress, message, ...details });
+  };
+
+  try {
+    const { paper } = req.body;
+    
+    if (!paper || !paper.title) {
+      sendEvent({ type: 'error', message: '请提供论文信息' });
+      return res.end();
+    }
+
+    const { title, abstract, pdfUrl } = paper;
+    
+    console.log('\n🔬 ========== 增强分析 ==========');
+    console.log(`论文: ${title}`);
+    console.log(`模式: 多源检索 + 深度解读`);
+
+    // 执行增强分析
+    const result = await pdfEnhancedAnalysisService.analyzeWithEnhancement(
+      pdfUrl,
+      title,
+      abstract || '',
+      sendProgress
+    );
+
+    // 发送完成事件
+    sendEvent({
+      type: 'complete',
+      content: result.content,
+      topics: result.topics,
+      searchResults: result.searchResults,
+      metadata: result.metadata
+    });
+
+    console.log('✅ 增强分析完成');
+    console.log('========================================\n');
+
+  } catch (error) {
+    console.error('❌ 增强分析失败:', error);
+    sendEvent({ 
+      type: 'error', 
+      message: error.message || '增强分析失败'
+    });
+  } finally {
+    res.end();
   }
 });
 
