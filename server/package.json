@@ -21,6 +21,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.19.1",
     "node-cache": "^5.1.2",
+    "node-cron": "^4.2.1",
     "openai": "^4.20.1",
     "rss-parser": "^3.13.0",
     "sqlite3": "^5.1.6",

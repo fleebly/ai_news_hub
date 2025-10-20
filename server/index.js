@@ -15,6 +15,8 @@ const blogsRoutes = require('./routes/blogs');
 // const wechatRoutes = require('./routes/wechat');
 const aiPublishRoutes = require('./routes/aiPublishRoutes');
 const paperAnalysisRoutes = require('./routes/paperAnalysis');
+const schedulerRoutes = require('./routes/scheduler');
+const schedulerService = require('./services/schedulerService');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -51,6 +53,7 @@ app.use('/api', blogsRoutes);
 // app.use('/api', wechatRoutes); // 临时禁用以提升性能
 app.use('/api/ai-publish', aiPublishRoutes);
 app.use('/api/paper-analysis', paperAnalysisRoutes);
+app.use('/api', schedulerRoutes);
 
 // 健康检查
 app.get('/api/health', (req, res) => {
@@ -79,11 +82,27 @@ const startServer = async () => {
     app.listen(PORT, () => {
       console.log(`🚀 AI编程教练服务器运行在端口 ${PORT}`);
       console.log(`📚 环境: ${process.env.NODE_ENV || 'development'}`);
+      
+      // 启动定时任务服务
+      schedulerService.start();
     });
   } catch (error) {
     console.error('❌ 服务器启动失败:', error);
     process.exit(1);
   }
 };
+
+// 优雅退出
+process.on('SIGINT', () => {
+  console.log('\n收到退出信号，正在关闭服务...');
+  schedulerService.stop();
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('\n收到终止信号，正在关闭服务...');
+  schedulerService.stop();
+  process.exit(0);
+});
 
 startServer();
