@@ -107,6 +107,13 @@ const Papers = () => {
   const [showTrendingOnly, setShowTrendingOnly] = useState(false)
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
   
+  // 高级搜索状态
+  const [showAdvancedSearch, setShowAdvancedSearch] = useState(false)
+  const [searchMode, setSearchMode] = useState('local') // 'local', 'online', 'both'
+  const [searchField, setSearchField] = useState('all') // 'all', 'title', 'author', 'arxivId'
+  const [searching, setSearching] = useState(false)
+  const [onlineResults, setOnlineResults] = useState([])
+  
   // 收藏功能
   const [favorites, setFavorites] = useState([])
   
@@ -379,6 +386,85 @@ const Papers = () => {
       alert('❌ 爬取失败: ' + error.message + '\n\n💡 建议使用"刷新"按钮（🔄）')
     } finally {
       setRefreshing(false)
+    }
+  }
+
+  // 高级搜索功能
+  const handleAdvancedSearch = async () => {
+    if (!searchTerm.trim()) {
+      alert('请输入搜索内容')
+      return
+    }
+
+    try {
+      setSearching(true)
+      setOnlineResults([])
+
+      // 构建搜索参数
+      const searchParams = {}
+      
+      if (searchField === 'arxivId') {
+        searchParams.arxivId = searchTerm.trim()
+      } else if (searchField === 'title') {
+        searchParams.title = searchTerm.trim()
+      } else if (searchField === 'author') {
+        searchParams.author = searchTerm.trim()
+      } else {
+        searchParams.keywords = searchTerm.trim()
+      }
+
+      // 添加分类过滤
+      if (selectedCategory !== 'all') {
+        const categoryMap = {
+          'nlp': 'cs.CL',
+          'cv': 'cs.CV',
+          'ml': 'cs.LG',
+          'robotics': 'cs.RO'
+        }
+        searchParams.category = categoryMap[selectedCategory] || ''
+      }
+
+      searchParams.maxResults = 50
+      searchParams.sortBy = 'relevance'
+      searchParams.saveToDb = searchMode === 'online' || searchMode === 'both' // 在线搜索时保存
+
+      // 在线搜索
+      if (searchMode === 'online' || searchMode === 'both') {
+        const response = await fetch('http://localhost:5000/api/papers/search', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(searchParams)
+        })
+
+        const data = await response.json()
+        
+        if (data.success) {
+          setOnlineResults(data.papers)
+          
+          if (searchMode === 'online') {
+            // 仅在线模式，直接显示在线结果
+            setPapers(data.papers)
+            alert(`🔍 在线搜索完成！找到 ${data.count} 篇论文`)
+          } else {
+            // 合并模式，重新获取本地数据（因为可能已保存）
+            await fetchPapers()
+            alert(`🔍 搜索完成！在线找到 ${data.count} 篇论文，已添加到本地库`)
+          }
+        }
+      }
+
+      // 本地搜索模式已通过筛选实现（filteredPapers）
+      if (searchMode === 'local') {
+        alert(`🔍 本地搜索完成！请查看筛选结果`)
+      }
+
+    } catch (error) {
+      console.error('搜索失败:', error)
+      alert('❌ 搜索失败: ' + error.message)
+    } finally {
+      setSearching(false)
     }
   }
 
@@ -773,32 +859,110 @@ const Papers = () => {
         {/* Filters */}
         <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Search */}
-              <div className="relative">
+            {/* 搜索栏 */}
+            <div className="flex gap-2">
+              <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="搜索论文标题或作者..."
+                  placeholder={searchField === 'arxivId' ? '输入arXiv ID (如: 2303.08774)' : 
+                             searchField === 'title' ? '输入论文标题关键词...' :
+                             searchField === 'author' ? '输入作者名称...' : 
+                             '搜索论文...'}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleAdvancedSearch()}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
               </div>
-
-              {/* Category Filter */}
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              <button
+                onClick={handleAdvancedSearch}
+                disabled={searching || !searchTerm.trim()}
+                className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
               >
-                {categories.map(category => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
+                {searching ? (
+                  <>
+                    <Loader className="h-4 w-4 animate-spin" />
+                    搜索中...
+                  </>
+                ) : (
+                  <>
+                    <Search className="h-4 w-4" />
+                    搜索
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => setShowAdvancedSearch(!showAdvancedSearch)}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2 transition-colors"
+              >
+                <Filter className="h-4 w-4" />
+                {showAdvancedSearch ? '收起' : '高级'}
+              </button>
+            </div>
 
+            {/* 高级搜索选项 */}
+            {showAdvancedSearch && (
+              <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* 搜索范围 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">搜索范围</label>
+                    <select
+                      value={searchMode}
+                      onChange={(e) => setSearchMode(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm"
+                    >
+                      <option value="local">🏠 本地数据库 ({papers.length}篇)</option>
+                      <option value="online">🌐 arXiv在线库</option>
+                      <option value="both">🔄 本地+在线（自动保存）</option>
+                    </select>
+                  </div>
+
+                  {/* 搜索字段 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">搜索字段</label>
+                    <select
+                      value={searchField}
+                      onChange={(e) => setSearchField(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm"
+                    >
+                      <option value="all">🔍 全部</option>
+                      <option value="arxivId">🎯 arXiv ID（精确）</option>
+                      <option value="title">📄 标题</option>
+                      <option value="author">👤 作者</option>
+                    </select>
+                  </div>
+
+                  {/* 分类过滤 */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">分类过滤</label>
+                    <select
+                      value={selectedCategory}
+                      onChange={(e) => setSelectedCategory(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-sm"
+                    >
+                      {categories.map(category => (
+                        <option key={category.id} value={category.id}>
+                          {category.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="text-xs text-gray-500">
+                  💡 提示: 
+                  {searchMode === 'local' && ' 在本地数据库中搜索'}
+                  {searchMode === 'online' && ' 在arXiv在线库中搜索，结果会自动保存到本地'}
+                  {searchMode === 'both' && ' 先在本地搜索，再从arXiv获取最新论文并保存'}
+                  {searchField === 'arxivId' && ' | arXiv ID格式: 2303.08774 或 arxiv:2303.08774'}
+                </div>
+              </div>
+            )}
+
+            {/* 简化的筛选器 */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Conference Filter */}
               <select
                 value={selectedConference}
@@ -811,39 +975,47 @@ const Papers = () => {
                   </option>
                 ))}
               </select>
+              
+              {/* 快捷筛选 */}
+              <div className="flex items-center gap-4">
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showTrendingOnly}
+                    onChange={(e) => setShowTrendingOnly(e.target.checked)}
+                    className="form-checkbox h-4 w-4 text-purple-600 rounded"
+                  />
+                  <span className="ml-2 text-sm text-gray-700 flex items-center">
+                    <TrendingUp className="h-4 w-4 mr-1 text-red-500" />
+                    热门
+                  </span>
+                </label>
+                
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showFavoritesOnly}
+                    onChange={(e) => setShowFavoritesOnly(e.target.checked)}
+                    className="form-checkbox h-4 w-4 text-pink-600 rounded"
+                  />
+                  <span className="ml-2 text-sm text-gray-700 flex items-center">
+                    <Heart className="h-4 w-4 mr-1 text-pink-500 fill-current" />
+                    收藏 ({favorites.length})
+                  </span>
+                </label>
+              </div>
             </div>
             
-            {/* Filters */}
-            <div className="flex items-center space-x-6">
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showTrendingOnly}
-                  onChange={(e) => setShowTrendingOnly(e.target.checked)}
-                  className="form-checkbox h-4 w-4 text-purple-600 rounded focus:ring-purple-500"
-                />
-                <span className="ml-2 text-sm text-gray-700 flex items-center">
-                  <TrendingUp className="h-4 w-4 mr-1 text-red-500" />
-                  只显示热门论文
-                </span>
-              </label>
-              
-              <label className="flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={showFavoritesOnly}
-                  onChange={(e) => setShowFavoritesOnly(e.target.checked)}
-                  className="form-checkbox h-4 w-4 text-pink-600 rounded focus:ring-pink-500"
-                />
-                <span className="ml-2 text-sm text-gray-700 flex items-center">
-                  <Heart className="h-4 w-4 mr-1 text-pink-500 fill-current" />
-                  只显示收藏 ({favorites.length})
-                </span>
-              </label>
-              
-              <span className="text-xs text-gray-500">
-                ({filteredPapers.length} 篇论文)
+            {/* 结果统计 */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-600">
+                共找到 <span className="font-semibold text-purple-600">{filteredPapers.length}</span> 篇论文
               </span>
+              {onlineResults.length > 0 && (
+                <span className="text-sm text-green-600">
+                  ✅ 在线搜索: {onlineResults.length} 篇新论文已添加
+                </span>
+              )}
             </div>
           </div>
         </div>
