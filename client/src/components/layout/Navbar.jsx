@@ -29,7 +29,8 @@ const Navbar = () => {
     { name: '资讯', href: '/news', icon: Newspaper },
     { name: '论文', href: '/papers', icon: FileText },
     { name: '综述', href: '/reviews', icon: BookOpen },
-    { name: '博客', href: '/blogs', icon: Brain },
+    { name: '学习', href: '/learning', icon: Brain },
+    { name: '博客', href: '/blogs', icon: FileText },
     // { name: 'AI解读', href: '/paper-analysis', icon: Sparkles },  // 已集成到论文页面
     // { name: '微信公众号', href: '/wechat', icon: MessageCircle },
     { name: '开源', href: '/opensource', icon: Github },

@@ -13,6 +13,7 @@ import NewsDetail from './pages/NewsDetail'
 import Papers from './pages/Papers'
 import Blogs from './pages/Blogs'
 import Reviews from './pages/Reviews'
+import Learning from './pages/Learning'
 // import Wechat from './pages/Wechat'
 // import WechatDetail from './pages/WechatDetail'
 // import PaperAnalysis from './pages/PaperAnalysis'  // 已集成到论文页面
@@ -73,6 +74,10 @@ function App() {
           <Route 
             path="/reviews" 
             element={<Reviews />} 
+          />
+          <Route 
+            path="/learning" 
+            element={<Learning />} 
           />
           {/* AI解读功能已集成到论文页面 */}
           {/* <Route 
