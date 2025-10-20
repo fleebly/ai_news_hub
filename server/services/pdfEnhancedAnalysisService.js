@@ -384,7 +384,7 @@ class PDFEnhancedAnalysisService {
     }
 
     const prompt = `你是一位顶级的AI研究专家和技术作家，擅长深入浅出地解读前沿论文。
-
+      
 # 当前论文
 
 **标题**: ${title}
@@ -393,6 +393,8 @@ class PDFEnhancedAnalysisService {
 
 **核心主题**: ${topics.join(', ')}
 ${figuresSection}
+
+${imageMarkdown ? `\n---\n\n# 📸 论文图表（请在文章中嵌入）\n\n以下是从论文中提取的关键图表，请在文章的适当位置使用这些图片：\n\n${imageMarkdown}\n\n**使用说明**：\n- 将这些图片嵌入到相关技术讲解的段落中\n- 每个图片后添加简短的说明文字\n- 确保图片与周围文字的逻辑连贯\n- 不要把所有图片堆在一起，要分散到各个章节\n` : ''}
 
 ---
 
