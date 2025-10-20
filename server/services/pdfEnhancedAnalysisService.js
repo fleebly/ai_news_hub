@@ -368,7 +368,10 @@ class PDFEnhancedAnalysisService {
     let figuresSection = '';
     let imageMarkdown = '';
     
+    console.log('\n🖼️  构建图片Markdown:');
     if (visionAnalysis && visionAnalysis.keyFigures && visionAnalysis.keyFigures.length > 0) {
+      console.log(`  - 发现 ${visionAnalysis.keyFigures.length} 个关键图表`);
+      
       figuresSection = '\n## 论文关键图表\n\n' + 
         visionAnalysis.keyFigures.map((fig, idx) => {
           const imageUrl = visionAnalysis.croppedImageUrls?.[idx] || '';
@@ -378,9 +381,18 @@ class PDFEnhancedAnalysisService {
       // 准备图片的Markdown格式（用于嵌入文章）
       imageMarkdown = visionAnalysis.keyFigures.map((fig, idx) => {
         const imageUrl = visionAnalysis.croppedImageUrls?.[idx] || '';
-        if (!imageUrl) return '';
+        if (!imageUrl) {
+          console.log(`  ✗ 图${idx + 1} 无URL`);
+          return '';
+        }
+        console.log(`  ✓ 图${idx + 1}: ${imageUrl.substring(0, 60)}...`);
         return `![图${idx + 1}: ${fig.caption || '论文关键图表'}](${imageUrl})`;
       }).filter(Boolean).join('\n\n');
+      
+      console.log(`  - 生成 ${imageMarkdown.split('\n\n').length} 个图片Markdown`);
+      console.log(`  - Markdown总长度: ${imageMarkdown.length} 字符`);
+    } else {
+      console.log(`  - 无图表数据`);
     }
 
     const prompt = `你是一位顶级的AI研究专家和技术作家，擅长深入浅出地解读前沿论文。
@@ -514,6 +526,21 @@ ${blogSection || '暂无'}
 9. 每个章节都要充分展开，不要简略带过，要做到知其然和所以然
 10. 引用的参考文献要详细说明其与当前论文的关系，不只是列出标题`;
 
+    // 调试：验证prompt中是否包含图片
+    console.log('\n🔍 Prompt验证:');
+    console.log(`  - Prompt总长度: ${prompt.length} 字符`);
+    if (imageMarkdown && imageMarkdown.length > 0) {
+      const imageCount = (prompt.match(/!\[/g) || []).length;
+      console.log(`  ✓ Prompt包含 ${imageCount} 个图片标记`);
+      if (imageCount === 0) {
+        console.log(`  ⚠️ WARNING: imageMarkdown有内容但未出现在prompt中！`);
+        console.log(`  imageMarkdown预览: ${imageMarkdown.substring(0, 200)}...`);
+      }
+    } else {
+      console.log(`  - Prompt中无图片`);
+    }
+    console.log('');
+
     return prompt;
   }
 
@@ -568,6 +595,39 @@ ${blogSection || '暂无'}
 
       // 4. 生成增强分析
       sendProgress(55, '🤖 AI整合所有资料...', { stage: 'generate' });
+      
+      // 调试：打印视觉分析结果
+      console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📊 视觉分析结果检查:');
+      if (visionAnalysis) {
+        console.log(`  ✓ visionAnalysis存在`);
+        console.log(`  - 类型: ${typeof visionAnalysis}`);
+        console.log(`  - 键: ${Object.keys(visionAnalysis).join(', ')}`);
+        
+        if (visionAnalysis.croppedImageUrls) {
+          console.log(`  ✓ croppedImageUrls存在`);
+          console.log(`  - 图片数量: ${visionAnalysis.croppedImageUrls.length}`);
+          visionAnalysis.croppedImageUrls.forEach((url, idx) => {
+            console.log(`  - 图${idx + 1}: ${url}`);
+          });
+        } else {
+          console.log(`  ✗ croppedImageUrls不存在`);
+        }
+        
+        if (visionAnalysis.keyFigures) {
+          console.log(`  ✓ keyFigures存在`);
+          console.log(`  - 图表数量: ${visionAnalysis.keyFigures.length}`);
+          visionAnalysis.keyFigures.forEach((fig, idx) => {
+            console.log(`  - 图表${idx + 1}: ${fig.caption || '(无标题)'}`);
+          });
+        } else {
+          console.log(`  ✗ keyFigures不存在`);
+        }
+      } else {
+        console.log(`  ✗ visionAnalysis为null/undefined`);
+      }
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+      
       const paperInfo = { 
         title, 
         abstract, 

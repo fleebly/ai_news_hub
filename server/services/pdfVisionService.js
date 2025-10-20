@@ -251,6 +251,12 @@ class PDFVisionService {
           
           if (jsonStr) {
             console.log(`   尝试解析JSON (前100字符): ${jsonStr.substring(0, 100)}`);
+            
+            // 清理可能的问题字符
+            jsonStr = jsonStr
+              .replace(/[\u0000-\u001F\u007F-\u009F]/g, '') // 移除控制字符
+              .replace(/,(\s*[}\]])/g, '$1'); // 移除尾随逗号
+            
             const parsed = JSON.parse(jsonStr);
             
             // 确保所有必要字段都存在
@@ -266,10 +272,30 @@ class PDFVisionService {
               containsCoreTech: parsed.containsCoreTech || false,
               rawAnalysis: resultStr
             };
+          } else {
+            console.warn(`⚠️  无法提取JSON对象 (第${pageNumber}页)`);
+            console.log(`   响应内容: ${resultStr.substring(0, 300)}...`);
           }
         } catch (e) {
           console.warn(`⚠️  JSON解析失败 (第${pageNumber}页):`, e.message);
-          // 如果JSON解析失败，尝试从文本中提取关键信息
+          console.log(`   错误详情: ${resultStr.substring(0, 200)}...`);
+          // 尝试简单的文本分析作为fallback
+          const hasImportantFigure = /图|表|Fig|Table|algorithm|框架|架构/i.test(resultStr);
+          if (hasImportantFigure) {
+            console.log(`   ✓ 通过文本分析检测到可能的图表`);
+            return {
+              pageType: 'figure',
+              hasImportantFigure: true,
+              figureType: 'detected_by_text',
+              figureTitle: '检测到的图表',
+              figureDescription: resultStr.substring(0, 200),
+              figureBbox: null,
+              keyPoints: [],
+              technicalDepth: 'medium',
+              containsCoreTech: true,
+              rawAnalysis: resultStr
+            };
+          }
         }
 
         // 如果不是JSON或解析失败，返回原始文本分析
@@ -360,6 +386,17 @@ class PDFVisionService {
       
       let stdout = '';
       let stderr = '';
+      let completed = false;
+      
+      // 添加超时保护（5分钟）
+      const timeout = setTimeout(() => {
+        if (!completed) {
+          completed = true;
+          console.error('⚠️  裁剪超时（5分钟），使用原图');
+          python.kill();
+          resolve(images);
+        }
+      }, 5 * 60 * 1000); // 5分钟
       
       python.stdout.on('data', (data) => {
         stdout += data.toString();
@@ -370,6 +407,10 @@ class PDFVisionService {
       });
       
       python.on('close', (code) => {
+        if (completed) return; // 已经超时处理过了
+        completed = true;
+        clearTimeout(timeout);
+        
         if (code !== 0) {
           console.error('⚠️  图表裁剪失败，使用原图:', stderr);
           // 失败时返回原图
@@ -392,21 +433,31 @@ class PDFVisionService {
             }
           } catch (e) {
             console.error('⚠️  解析裁剪结果失败，使用原图:', e.message);
+            console.log(`stdout内容: ${stdout.substring(0, 200)}...`);
             resolve(images);
           }
         }
       });
       
-      // 发送输入数据
-      python.stdin.write(JSON.stringify(inputData));
-      python.stdin.end();
-      
-      // 超时保护（30秒）
-      setTimeout(() => {
-        python.kill();
-        console.error('⚠️  裁剪超时，使用原图');
+      python.on('error', (error) => {
+        if (completed) return;
+        completed = true;
+        clearTimeout(timeout);
+        console.error('⚠️  启动Python脚本失败，使用原图:', error.message);
         resolve(images);
-      }, 30000);
+      });
+      
+      // 发送输入数据
+      try {
+        python.stdin.write(JSON.stringify(inputData));
+        python.stdin.end();
+      } catch (error) {
+        if (completed) return;
+        completed = true;
+        clearTimeout(timeout);
+        console.error('⚠️  发送数据到Python脚本失败，使用原图:', error.message);
+        resolve(images);
+      }
     });
   }
 

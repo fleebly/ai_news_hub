@@ -56,3 +56,6 @@ pnpm-debug.log*
 .cursor/
 
 server/.env.bak*
+
+# Local Netlify folder
+.netlify

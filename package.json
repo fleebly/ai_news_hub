@@ -10,11 +10,17 @@
     "build": "cd client && npm run build",
     "start": "cd server && npm start"
   },
-  "keywords": ["ai", "programming", "coach", "education", "coding"],
+  "keywords": [
+    "ai",
+    "programming",
+    "coach",
+    "education",
+    "coding"
+  ],
   "author": "AI Teacher",
   "license": "MIT",
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "netlify-plugin-cache": "^1.0.3"
   }
 }
-
