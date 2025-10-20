@@ -17,6 +17,7 @@ const aiPublishRoutes = require('./routes/aiPublishRoutes');
 const paperAnalysisRoutes = require('./routes/paperAnalysis');
 const schedulerRoutes = require('./routes/scheduler');
 const reviewRoutes = require('./routes/reviews');
+const learningRoutes = require('./routes/learning');
 const schedulerService = require('./services/schedulerService');
 
 const app = express();
@@ -56,6 +57,7 @@ app.use('/api/ai-publish', aiPublishRoutes);
 app.use('/api/paper-analysis', paperAnalysisRoutes);
 app.use('/api', schedulerRoutes);
 app.use('/api', reviewRoutes);
+app.use('/api', learningRoutes);
 
 // 健康检查
 app.get('/api/health', (req, res) => {
