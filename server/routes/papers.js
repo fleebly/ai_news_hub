@@ -91,6 +91,86 @@ router.get('/papers/trending', async (req, res) => {
 });
 
 /**
+ * POST /api/papers/search
+ * 高级搜索arXiv论文
+ * Body: { 
+ *   arxivId: '2301.12345',           // arXiv ID（精确搜索）
+ *   title: 'transformer attention',  // 标题关键词
+ *   author: 'Yann LeCun',            // 作者名称
+ *   keywords: 'deep learning',       // 全文关键词
+ *   abstract: 'neural network',      // 摘要关键词
+ *   category: 'cs.AI',               // 分类过滤
+ *   maxResults: 30,                  // 最大结果数
+ *   sortBy: 'relevance',             // 排序方式
+ *   saveToDb: false                  // 是否保存到数据库
+ * }
+ */
+router.post('/papers/search', async (req, res) => {
+  try {
+    const {
+      arxivId,
+      title,
+      author,
+      keywords,
+      abstract,
+      category,
+      maxResults = 30,
+      sortBy = 'relevance',
+      saveToDb = false
+    } = req.body;
+
+    console.log('\n🔍 ========== arXiv 高级搜索 ==========');
+    console.log('搜索条件:', {
+      arxivId,
+      title: title ? `"${title}"` : undefined,
+      author: author ? `"${author}"` : undefined,
+      keywords: keywords ? `"${keywords}"` : undefined,
+      abstract: abstract ? `"${abstract}"` : undefined,
+      category,
+      maxResults,
+      sortBy
+    });
+
+    const papers = await arxivService.searchArxivPapersAdvanced({
+      arxivId,
+      title,
+      author,
+      keywords,
+      abstract,
+      category,
+      maxResults: parseInt(maxResults),
+      sortBy,
+      saveToDb
+    });
+
+    console.log(`✅ 搜索完成: 找到 ${papers.length} 篇论文`);
+    console.log('========================================\n');
+
+    res.json({
+      success: true,
+      papers: papers,
+      count: papers.length,
+      query: {
+        arxivId,
+        title,
+        author,
+        keywords,
+        abstract,
+        category,
+        sortBy
+      }
+    });
+  } catch (error) {
+    console.error('❌ 搜索失败:', error.message);
+    res.status(500).json({
+      success: false,
+      message: '搜索论文失败',
+      error: process.env.NODE_ENV === 'development' ? error.message : '服务器错误'
+    });
+  }
+});
+
+/**
  * POST /api/papers/refresh
  * 刷新论文缓存并更新数据库
  */
