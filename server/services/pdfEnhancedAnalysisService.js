@@ -42,7 +42,12 @@ class PDFEnhancedAnalysisService {
 \`\`\``;
 
     try {
-      const response = await aliyunBailianService.chat(prompt, {
+      // 将 prompt 转换为消息格式
+      const messages = [
+        { role: 'user', content: prompt }
+      ];
+      
+      const response = await aliyunBailianService.chat(messages, {
         temperature: 0.5,
         maxTokens: 500
       });
@@ -260,21 +265,20 @@ class PDFEnhancedAnalysisService {
     const prompt = this.buildEnhancedPrompt(paperInfo, searchResults);
 
     try {
-      let fullContent = '';
-      const stream = await aliyunBailianService.chatWithTextStream(prompt, {
+      // 使用 chat 方法，传递正确的消息格式
+      sendProgress(70, '🤖 AI正在整合资料...', { stage: 'generate' });
+      
+      const messages = [
+        { role: 'user', content: prompt }
+      ];
+      
+      const fullContent = await aliyunBailianService.chat(messages, {
         model: this.textModel,
         temperature: 0.7,
         maxTokens: 8000
       });
 
-      for await (const chunk of stream) {
-        fullContent += chunk;
-        const progress = 60 + Math.min((fullContent.length / 8000) * 30, 30);
-        sendProgress(progress, '🤖 正在生成深度解读...', { 
-          stage: 'generate', 
-          currentContent: fullContent 
-        });
-      }
+      sendProgress(90, '🤖 深度解读生成完成...', { stage: 'generate' });
 
       console.log(`✅ 分析完成，共 ${fullContent.length} 字`);
       return fullContent;
