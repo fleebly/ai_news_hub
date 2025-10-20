@@ -160,40 +160,52 @@ class PDFVisionService {
       },
       {
         role: 'user',
-        content: `这是一篇AI论文PDF的第${pageNumber}页图片。请识别页面中的**核心图表**并返回其位置和描述。
+        content: `这是一篇AI论文PDF的第${pageNumber}页图片。请**精确识别**页面中的核心图表位置并返回。
+
+⚠️ 重要要求：
+1. 边界框必须**紧贴图表边缘**，不要包含多余空白
+2. 仔细识别图表的实际边界，包括标题、图例、坐标轴标签
+3. x, y 是左上角坐标，width 和 height 是宽高
+4. 所有值都是相对位置（0-1之间的小数）
 
 返回JSON格式：
 {
-  "pageType": "页面类型",
+  "pageType": "页面类型（text/figure/table/algorithm/mixed）",
   "hasImportantFigure": true或false,
-  "figureType": "具体图表类型",
-  "figureTitle": "图表标题",
-  "figureDescription": "图表详细描述（150-300字）",
+  "figureType": "具体类型（architecture_diagram/flow_chart/result_graph/algorithm_block/table/other）",
+  "figureTitle": "图表标题（如 'Figure 1: Model Architecture'）",
+  "figureDescription": "图表详细描述（150-300字，说明图表内容和技术细节）",
   "figureBbox": {
     "x": 0.1,
     "y": 0.2,
     "width": 0.8,
     "height": 0.6
   },
-  "keyPoints": ["关键信息1", "关键信息2"],
+  "keyPoints": ["技术要点1", "技术要点2"],
   "technicalDepth": "high/medium/low",
   "containsCoreTech": true或false
 }
 
 **关键要求**：
-1. **figureBbox**是图表的边界框，使用相对坐标（0.0-1.0）：
-   - x: 左边距占页面宽度的比例（0=最左，1=最右）
-   - y: 上边距占页面高度的比例（0=最上，1=最下）
-   - width: 图表宽度占页面宽度的比例
-   - height: 图表高度占页面高度的比例
+1. **figureBbox 必须精确紧贴图表边界**，使用相对坐标（0.0-1.0）：
+   - x: 图表左边缘位置（相对页面宽度）
+   - y: 图表顶部位置（相对页面高度）
+   - width: 图表实际宽度（相对页面宽度）
+   - height: 图表实际高度（相对页面高度）
    
-2. 请仔细观察图表的实际位置，**尽量精确**地标注边界框
-3. 如果图表占据大部分页面，bbox可能是 {"x": 0.05, "y": 0.1, "width": 0.9, "height": 0.8}
-4. 如果图表在页面中部，bbox可能是 {"x": 0.1, "y": 0.3, "width": 0.8, "height": 0.4}
+2. **精确度至关重要**：
+   - ✅ 紧贴图表边缘，包含标题、图例、坐标轴
+   - ❌ 不要包含周围大片空白区域
+   - ✅ 仔细观察图表实际占据的空间
+   
+3. 示例（仅供参考，请根据实际情况）：
+   - 全页大图：{"x": 0.05, "y": 0.08, "width": 0.90, "height": 0.85}
+   - 页面中部：{"x": 0.15, "y": 0.35, "width": 0.70, "height": 0.45}
+   - 小图表：{"x": 0.20, "y": 0.40, "width": 0.60, "height": 0.30}
 
-5. figureDescription只描述图表本身（不包括周围文字）
+4. figureDescription 只描述图表内容，不包括周围文字
 
-立即分析并返回JSON：`
+**立即精确分析并返回JSON**：`
       }
     ];
 

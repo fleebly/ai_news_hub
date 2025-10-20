@@ -11,14 +11,14 @@ from io import BytesIO
 from PIL import Image
 
 
-def crop_figure(image_base64, bbox, padding=0.02):
+def crop_figure(image_base64, bbox, padding=0.005):
     """
-    从base64图片中裁剪指定区域
+    从base64图片中裁剪指定区域（精确裁剪）
     
     Args:
         image_base64: base64编码的图片（可以是data URI或纯base64）
         bbox: 边界框字典 {"x": 0.1, "y": 0.2, "width": 0.8, "height": 0.6}
-        padding: 额外的边距（相对值，默认2%）
+        padding: 额外的边距（相对值，默认0.5%）- 减少到最小以保证精确裁剪
     
     Returns:
         裁剪后的图片的base64编码（data URI格式）
@@ -39,18 +39,27 @@ def crop_figure(image_base64, bbox, padding=0.02):
         width, height = img.size
         
         # 计算实际像素坐标
-        # 添加padding以避免裁剪过紧
+        # 使用最小padding以保证精确裁剪
+        # 如果视觉模型已经精确标注，padding应该非常小
         x = max(0, int((bbox['x'] - padding) * width))
         y = max(0, int((bbox['y'] - padding) * height))
         w = min(width - x, int((bbox['width'] + padding * 2) * width))
         h = min(height - y, int((bbox['height'] + padding * 2) * height))
         
+        # 确保裁剪区域有效
+        if w <= 0 or h <= 0:
+            # 如果计算出的区域无效，使用原始bbox不加padding
+            x = int(bbox['x'] * width)
+            y = int(bbox['y'] * height)
+            w = int(bbox['width'] * width)
+            h = int(bbox['height'] * height)
+        
         # 裁剪图片
         cropped = img.crop((x, y, x + w, y + h))
         
-        # 转换为base64
+        # 转换为base64（提高质量到98）
         buffered = BytesIO()
-        cropped.save(buffered, format="JPEG", quality=95, optimize=True)
+        cropped.save(buffered, format="JPEG", quality=98, optimize=True)
         cropped_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
         
         # 返回完整的data URI
