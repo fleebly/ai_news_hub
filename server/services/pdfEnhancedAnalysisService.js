@@ -4,6 +4,7 @@
  */
 const aliyunBailianService = require('./aliyunBailianService');
 const arxivService = require('./arxivService');
+const pdfVisionService = require('./pdfVisionService');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const NodeCache = require('node-cache');
@@ -266,17 +267,31 @@ class PDFEnhancedAnalysisService {
 
     try {
       // 使用 chat 方法，传递正确的消息格式
-      sendProgress(70, '🤖 AI正在整合资料...', { stage: 'generate' });
+      sendProgress(70, '🤖 AI正在整合资料（预计1-3分钟）...', { stage: 'generate' });
       
       const messages = [
         { role: 'user', content: prompt }
       ];
       
-      const fullContent = await aliyunBailianService.chat(messages, {
-        model: this.textModel,
-        temperature: 0.7,
-        maxTokens: 8000
-      });
+      console.log(`📝 Prompt长度: ${prompt.length} 字符`);
+      console.log(`⏰ 开始AI生成，请耐心等待...`);
+      
+      const startTime = Date.now();
+      
+      const fullContent = await Promise.race([
+        aliyunBailianService.chat(messages, {
+          model: this.textModel,
+          temperature: 0.7,
+          maxTokens: 8000
+        }),
+        // 10分钟超时保护
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('AI生成超时（10分钟）')), 600000)
+        )
+      ]);
+
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      console.log(`⏱️  AI生成耗时: ${elapsed}秒`);
 
       sendProgress(90, '🤖 深度解读生成完成...', { stage: 'generate' });
 
@@ -285,6 +300,12 @@ class PDFEnhancedAnalysisService {
 
     } catch (error) {
       console.error('生成分析失败:', error);
+      
+      // 提供更友好的错误信息
+      if (error.message.includes('超时')) {
+        throw new Error('AI生成超时，论文可能过于复杂。建议稍后重试或使用标准解读模式。');
+      }
+      
       throw error;
     }
   }
@@ -293,7 +314,7 @@ class PDFEnhancedAnalysisService {
    * 构建增强分析提示词
    */
   buildEnhancedPrompt(paperInfo, searchResults) {
-    const { title, abstract, topics } = paperInfo;
+    const { title, abstract, topics, visionAnalysis } = paperInfo;
 
     // 格式化搜索结果
     const formatResults = (results, source) => {
@@ -309,6 +330,15 @@ class PDFEnhancedAnalysisService {
     const zhihuSection = formatResults(searchResults.zhihu, '知乎');
     const blogSection = formatResults(searchResults.blogs, '技术博客');
 
+    // 格式化PDF图表信息
+    let figuresSection = '';
+    if (visionAnalysis && visionAnalysis.keyFigures && visionAnalysis.keyFigures.length > 0) {
+      figuresSection = '\n## 论文关键图表\n\n' + 
+        visionAnalysis.keyFigures.map((fig, idx) => {
+          return `**图${idx + 1}**: ${fig.caption || '(未标注)'}\n${fig.analysis || ''}\n`;
+        }).join('\n');
+    }
+
     const prompt = `你是一位顶级的AI研究专家和技术作家，擅长深入浅出地解读前沿论文。
 
 # 当前论文
@@ -318,6 +348,7 @@ class PDFEnhancedAnalysisService {
 **摘要**: ${abstract}
 
 **核心主题**: ${topics.join(', ')}
+${figuresSection}
 
 ---
 
@@ -436,7 +467,7 @@ ${blogSection || '暂无'}
   }
 
   /**
-   * 完整的增强分析流程
+   * 完整的增强分析流程（整合PDF图表提取）
    * @param {string} pdfUrl - PDF URL
    * @param {string} title - 论文标题
    * @param {string} abstract - 论文摘要
@@ -445,18 +476,47 @@ ${blogSection || '暂无'}
    */
   async analyzeWithEnhancement(pdfUrl, title, abstract, sendProgress) {
     try {
-      sendProgress(0, '🚀 开始增强分析...', { stage: 'init' });
+      sendProgress(0, '🚀 开始深度解读（含图表提取）...', { stage: 'init' });
 
       // 1. 提取核心Topic
-      sendProgress(10, '🔍 提取核心主题...', { stage: 'extract_topics' });
+      sendProgress(5, '🔍 提取核心主题...', { stage: 'extract_topics' });
       const topics = await this.extractCoreTopics(pdfUrl, title, abstract);
 
-      // 2. 多源搜索
-      sendProgress(30, '🌐 联网搜索相关资料...', { stage: 'search' });
+      // 2. 提取PDF图表（并行执行）
+      sendProgress(10, '📄 提取PDF图表...', { stage: 'extract_figures' });
+      let visionAnalysis = null;
+      try {
+        console.log('\n📄 开始PDF图表提取...');
+        visionAnalysis = await pdfVisionService.hybridAnalysisWithProgress(
+          pdfUrl,
+          title,
+          abstract || '',
+          (progress, message, details) => {
+            // 映射进度到10-40%范围
+            const mappedProgress = 10 + (progress * 0.3);
+            sendProgress(mappedProgress, `📄 ${message}`, { stage: 'extract_figures', ...details });
+          }
+        );
+        console.log('✅ PDF图表提取完成');
+      } catch (error) {
+        console.warn('⚠️  PDF图表提取失败，将只使用文本分析:', error.message);
+        // 继续执行，不中断流程
+      }
+
+      // 3. 多源搜索
+      sendProgress(45, '🌐 联网搜索相关资料...', { stage: 'search' });
       const searchResults = await this.searchMultiSource(topics);
 
-      // 3. 生成增强分析
-      const paperInfo = { title, abstract, topics, pdfUrl };
+      // 4. 生成增强分析
+      sendProgress(55, '🤖 AI整合所有资料...', { stage: 'generate' });
+      const paperInfo = { 
+        title, 
+        abstract, 
+        topics, 
+        pdfUrl,
+        visionAnalysis // 传入视觉分析结果
+      };
+      
       const content = await this.generateEnhancedAnalysis(paperInfo, searchResults, sendProgress);
 
       sendProgress(95, '✅ 分析完成，整理结果...', { stage: 'done' });
@@ -465,9 +525,15 @@ ${blogSection || '暂无'}
         content,
         topics,
         searchResults,
+        visionAnalysis: visionAnalysis ? {
+          hasImages: visionAnalysis.croppedImageUrls && visionAnalysis.croppedImageUrls.length > 0,
+          imageCount: visionAnalysis.croppedImageUrls?.length || 0,
+          keyFigures: visionAnalysis.keyFigures || []
+        } : null,
         metadata: {
           totalSources: Object.values(searchResults).reduce((sum, arr) => sum + arr.length, 0),
-          generatedAt: new Date().toISOString()
+          generatedAt: new Date().toISOString(),
+          withPDFExtraction: !!visionAnalysis
         }
       };
 
