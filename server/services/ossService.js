@@ -67,7 +67,8 @@ class OSSService {
 
       // 生成唯一文件名
       const filename = options.filename || this.generateFilename();
-      const objectKey = `pdf-images/${filename}.jpg`;
+      const folder = options.folder || 'pdf-images';
+      const objectKey = `${folder}/${filename}.jpg`;
 
       // 上传到OSS
       const result = await this.client.put(objectKey, buffer, {
@@ -90,24 +91,26 @@ class OSSService {
   /**
    * 批量上传图片
    * @param {Array<string>} base64Images - base64图片数组
+   * @param {string} folder - 文件夹名称（可选，默认'pdf-images'）
    * @returns {Promise<Array<string>>} - 图片URL数组
    */
-  async uploadImages(base64Images) {
+  async uploadImages(base64Images, folder = 'pdf-images') {
     if (!this.enabled) {
       throw new Error('OSS服务未启用');
     }
 
-    console.log(`📤 开始批量上传 ${base64Images.length} 张图片到OSS...`);
+    console.log(`📤 开始批量上传 ${base64Images.length} 张图片到OSS (${folder})...`);
     
     const uploadPromises = base64Images.map((base64, index) => 
       this.uploadBase64Image(base64, { 
-        filename: `${Date.now()}_${index}` 
+        filename: `${Date.now()}_${index}`,
+        folder: folder
       })
     );
 
     try {
       const urls = await Promise.all(uploadPromises);
-      console.log(`✅ 批量上传完成: ${urls.length} 张图片`);
+      console.log(`✅ 批量上传完成: ${urls.length} 张图片 (${folder})`);
       return urls;
     } catch (error) {
       console.error('❌ 批量上传失败:', error.message);

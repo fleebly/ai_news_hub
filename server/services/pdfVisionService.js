@@ -672,15 +672,17 @@ class PDFVisionService {
 
       sendProgress(95, '✅ 分析完成，准备返回结果...', { stage: 'done' });
 
-      // 清理OSS图片（解读完成后删除临时图片）
+      // 清理OSS原始图片（仅删除全页截图，保留裁剪后的精选图片供文章使用）
       if (uploadedToOSS && imageUrls.length > 0) {
-        sendProgress(97, '🗑️ 清理临时图片...', { stage: 'cleanup' });
-        console.log('\n🗑️  清理OSS临时图片...');
+        sendProgress(97, '🗑️ 清理原始截图...', { stage: 'cleanup' });
+        console.log('\n🗑️  清理OSS原始全页截图（保留裁剪后的精选图片）...');
         try {
-          await ossService.deleteImages(imageUrls.concat(croppedImageUrls || []));
-          console.log(`✅ 已删除 ${imageUrls.length + (croppedImageUrls?.length || 0)} 张临时图片`);
+          // 仅删除原始的全页截图，保留裁剪后的图片
+          await ossService.deleteImages(imageUrls);
+          console.log(`✅ 已删除 ${imageUrls.length} 张原始截图`);
+          console.log(`📌 保留 ${croppedImageUrls?.length || 0} 张裁剪后的精选图片供文章使用`);
         } catch (error) {
-          console.warn('⚠️  清理OSS图片失败（不影响主流程）:', error.message);
+          console.warn('⚠️  清理OSS原始图片失败（不影响主流程）:', error.message);
         }
       }
 
