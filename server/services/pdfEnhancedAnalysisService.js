@@ -267,7 +267,7 @@ class PDFEnhancedAnalysisService {
 
     try {
       // 使用 chat 方法，传递正确的消息格式
-      sendProgress(70, '🤖 AI正在整合资料（预计1-3分钟）...', { stage: 'generate' });
+      sendProgress(70, '🤖 AI正在生成深度长文（5000字+，预计2-5分钟）...', { stage: 'generate' });
       
       const messages = [
         { role: 'user', content: prompt }
@@ -282,11 +282,11 @@ class PDFEnhancedAnalysisService {
         aliyunBailianService.chat(messages, {
           model: this.textModel,
           temperature: 0.7,
-          maxTokens: 8000
+          maxTokens: 20000  // 提升到20000，支持更长的深度解读（5000字+）
         }),
-        // 10分钟超时保护
+        // 15分钟超时保护（延长以支持更长内容生成）
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('AI生成超时（10分钟）')), 600000)
+          setTimeout(() => reject(new Error('AI生成超时（15分钟）')), 900000)
         )
       ]);
 
@@ -303,7 +303,7 @@ class PDFEnhancedAnalysisService {
       
       // 提供更友好的错误信息
       if (error.message.includes('超时')) {
-        throw new Error('AI生成超时，论文可能过于复杂。建议稍后重试或使用标准解读模式。');
+        throw new Error('AI生成超时（15分钟），论文过于复杂或资料过多。建议稍后重试或使用标准解读模式。');
       }
       
       throw error;
@@ -461,7 +461,8 @@ ${blogSection || '暂无'}
 2. 公式使用LaTeX语法，行内公式用 $...$ ，独立公式用 $$...$$
 3. 引用使用 [数字] 格式
 4. 保持专业但易懂的风格
-5. 总字数控制在3000-5000字`;
+5. **总字数不少于5000字**，可根据论文复杂度和内容深度自由扩展，追求质量而非字数限制
+6. 对于复杂论文，鼓励深入展开分析，充分利用所有检索到的参考资料`;
 
     return prompt;
   }
