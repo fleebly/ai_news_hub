@@ -494,8 +494,19 @@ router.post('/analyze-enhanced-stream', async (req, res) => {
 
     const { title, abstract, pdfUrl } = paper;
     
+    // 验证PDF URL
+    if (!pdfUrl || pdfUrl === 'undefined' || pdfUrl === '#') {
+      console.error('❌ PDF URL缺失或无效:', pdfUrl);
+      sendEvent({ 
+        type: 'error', 
+        message: `PDF URL无效: ${pdfUrl || '未提供'}。请确保论文有可用的PDF链接。` 
+      });
+      return res.end();
+    }
+    
     console.log('\n🔬 ========== 增强分析 ==========');
     console.log(`论文: ${title}`);
+    console.log(`PDF URL: ${pdfUrl}`);
     console.log(`模式: 多源检索 + 深度解读`);
 
     // 执行增强分析

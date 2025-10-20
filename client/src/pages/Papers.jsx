@@ -581,6 +581,15 @@ const Papers = () => {
       paper = selectedPaper
     }
     
+    // 验证PDF URL
+    const pdfUrl = paper.pdfUrl || paper.arxivUrl;
+    if (!pdfUrl || pdfUrl === '#') {
+      setAnalysisError('该论文没有可用的PDF链接，无法进行深度解读。请选择其他论文或手动输入arXiv链接。');
+      setShowAnalysisModal(true);
+      setAnalyzing(false);
+      return;
+    }
+    
     setAnalysisError('')
     setAnalysisLogs([])
     
@@ -609,6 +618,12 @@ const Papers = () => {
       
       // 使用深度解读模式（PDF图表提取 + 多源搜索）
       const url = `${baseURL}/paper-analysis/analyze-enhanced-stream`
+      
+      console.log('🔍 开始深度解读:', {
+        title: paper.title,
+        pdfUrl: pdfUrl,
+        hasPdf: !!pdfUrl
+      })
       
       const response = await fetch(url, {
         method: 'POST',
