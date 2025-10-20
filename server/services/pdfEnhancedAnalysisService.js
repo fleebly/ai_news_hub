@@ -296,7 +296,41 @@ class PDFEnhancedAnalysisService {
       sendProgress(90, '🤖 深度解读生成完成...', { stage: 'generate' });
 
       console.log(`✅ 分析完成，共 ${fullContent.length} 字`);
-      return fullContent;
+      
+      // 后处理：确保PDF图片被嵌入到文章中
+      let enhancedContent = fullContent;
+      
+      if (paperInfo.visionAnalysis && paperInfo.visionAnalysis.croppedImageUrls && 
+          paperInfo.visionAnalysis.croppedImageUrls.length > 0) {
+        
+        // 检查文章中是否已经包含了图片链接
+        const hasImages = paperInfo.visionAnalysis.croppedImageUrls.some(url => 
+          enhancedContent.includes(url)
+        );
+        
+        // 如果AI没有自动嵌入图片，我们在文章末尾添加"论文图表"章节
+        if (!hasImages) {
+          console.log('⚠️  AI未自动嵌入图片，添加图表章节...');
+          
+          const figuresSection = '\n\n---\n\n## 📊 论文关键图表\n\n' +
+            '以下是从论文中提取的关键图表，帮助更好地理解技术细节：\n\n' +
+            paperInfo.visionAnalysis.keyFigures.map((fig, idx) => {
+              const imageUrl = paperInfo.visionAnalysis.croppedImageUrls[idx];
+              if (!imageUrl) return '';
+              
+              return `### 图 ${idx + 1}: ${fig.caption || '论文关键图表'}\n\n` +
+                     `![${fig.caption || `图${idx + 1}`}](${imageUrl})\n\n` +
+                     `${fig.analysis ? `**图表说明**: ${fig.analysis}\n\n` : ''}`;
+            }).filter(Boolean).join('\n');
+          
+          enhancedContent += figuresSection;
+          console.log(`✅ 已添加 ${paperInfo.visionAnalysis.croppedImageUrls.length} 张图表`);
+        } else {
+          console.log(`✅ AI已自动嵌入图片到文章中`);
+        }
+      }
+      
+      return enhancedContent;
 
     } catch (error) {
       console.error('生成分析失败:', error);
@@ -330,13 +364,23 @@ class PDFEnhancedAnalysisService {
     const zhihuSection = formatResults(searchResults.zhihu, '知乎');
     const blogSection = formatResults(searchResults.blogs, '技术博客');
 
-    // 格式化PDF图表信息
+    // 格式化PDF图表信息（包含图片URL）
     let figuresSection = '';
+    let imageMarkdown = '';
+    
     if (visionAnalysis && visionAnalysis.keyFigures && visionAnalysis.keyFigures.length > 0) {
       figuresSection = '\n## 论文关键图表\n\n' + 
         visionAnalysis.keyFigures.map((fig, idx) => {
-          return `**图${idx + 1}**: ${fig.caption || '(未标注)'}\n${fig.analysis || ''}\n`;
+          const imageUrl = visionAnalysis.croppedImageUrls?.[idx] || '';
+          return `**图${idx + 1}**: ${fig.caption || '(未标注)'}\n${fig.analysis || ''}\n${imageUrl ? `图片URL: ${imageUrl}\n` : ''}`;
         }).join('\n');
+      
+      // 准备图片的Markdown格式（用于嵌入文章）
+      imageMarkdown = visionAnalysis.keyFigures.map((fig, idx) => {
+        const imageUrl = visionAnalysis.croppedImageUrls?.[idx] || '';
+        if (!imageUrl) return '';
+        return `![图${idx + 1}: ${fig.caption || '论文关键图表'}](${imageUrl})`;
+      }).filter(Boolean).join('\n\n');
     }
 
     const prompt = `你是一位顶级的AI研究专家和技术作家，擅长深入浅出地解读前沿论文。
@@ -462,7 +506,9 @@ ${blogSection || '暂无'}
 3. 引用使用 [数字] 格式
 4. 保持专业但易懂的风格
 5. **总字数不少于5000字**，可根据论文复杂度和内容深度自由扩展，追求质量而非字数限制
-6. 对于复杂论文，鼓励深入展开分析，充分利用所有检索到的参考资料`;
+6. 对于复杂论文，鼓励深入展开分析，充分利用所有检索到的参考资料
+7. **重要**：如果论文关键图表中提供了图片URL，请在文章的适当位置使用Markdown图片语法 ![描述](URL) 来嵌入这些图片
+8. 图片应该放在相关技术讲解的段落之后，帮助读者更好地理解内容`;
 
     return prompt;
   }
