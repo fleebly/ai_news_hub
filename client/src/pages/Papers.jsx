@@ -600,9 +600,16 @@ const Papers = () => {
         const saveResponse = await api.post('/papers/save', { paper });
         
         if (saveResponse.data.success) {
-          // 使用数据库返回的论文对象（确保有完整的数据库字段）
-          paper = saveResponse.data.paper;
+          const dbPaper = saveResponse.data.paper;
+          // 合并数据库返回的论文对象，保留前端需要的id字段
+          paper = {
+            ...dbPaper,
+            id: paper.id, // 保留前端的ID格式（arxiv_xxxx）
+            pdfUrl: dbPaper.pdfUrl || paper.pdfUrl,
+            arxivUrl: dbPaper.arxivUrl || paper.arxivUrl
+          };
           console.log(`✅ 论文已${saveResponse.data.isNew ? '保存' : '存在'}于数据库:`, paper.id);
+          console.log('📄 PDF URL:', paper.pdfUrl);
         }
       } catch (error) {
         console.error('⚠️ 保存论文失败，继续使用临时数据:', error.message);

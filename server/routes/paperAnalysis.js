@@ -492,11 +492,15 @@ router.post('/analyze-enhanced-stream', async (req, res) => {
       return res.end();
     }
 
-    const { title, abstract, pdfUrl } = paper;
+    const { title, abstract } = paper;
+    
+    // 智能获取PDF URL（支持多种字段名）
+    const pdfUrl = paper.pdfUrl || paper.pdf_url || paper.arxivUrl || paper.arxiv_url;
     
     // 验证PDF URL
     if (!pdfUrl || pdfUrl === 'undefined' || pdfUrl === '#') {
       console.error('❌ PDF URL缺失或无效:', pdfUrl);
+      console.error('📄 论文对象:', JSON.stringify(paper, null, 2));
       sendEvent({ 
         type: 'error', 
         message: `PDF URL无效: ${pdfUrl || '未提供'}。请确保论文有可用的PDF链接。` 

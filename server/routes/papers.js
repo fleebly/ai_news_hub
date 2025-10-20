@@ -187,14 +187,16 @@ router.post('/papers/save', async (req, res) => {
 
     console.log(`💾 保存论文到数据库: ${paper.title}`);
 
-    // 使用arxivService中的savePapersToDatabase方法
     const Paper = require('../models/Paper');
     
-    // 检查论文是否已存在
-    const existingPaper = await Paper.findOne({ id: paper.id });
+    // 提取arXiv ID（去除arxiv_前缀）
+    const paperId = paper.id.replace(/^arxiv_/, '');
+    
+    // 检查论文是否已存在（使用paperId字段）
+    const existingPaper = await Paper.findOne({ paperId: paperId });
     
     if (existingPaper) {
-      console.log(`📌 论文已存在，返回现有记录: ${paper.id}`);
+      console.log(`📌 论文已存在，返回现有记录: ${paperId}`);
       return res.json({
         success: true,
         message: '论文已存在',
@@ -203,16 +205,30 @@ router.post('/papers/save', async (req, res) => {
       });
     }
 
-    // 保存新论文
+    // 保存新论文（映射字段）
     const newPaper = new Paper({
-      ...paper,
+      paperId: paperId,
+      title: paper.title,
+      abstract: paper.abstract || paper.summary || '',
+      summary: paper.summary || paper.abstract || '',
+      authors: paper.authors || [],
+      category: paper.category || 'other',
+      conference: paper.conference || 'arXiv',
+      arxivUrl: paper.arxivUrl || `https://arxiv.org/abs/${paperId}`,
+      pdfUrl: paper.pdfUrl || `https://arxiv.org/pdf/${paperId}.pdf`,
+      codeUrl: paper.codeUrl || '',
+      tags: paper.tags || [],
+      citations: paper.citations || 0,
+      views: paper.views || 0,
+      trending: paper.trending || false,
+      publishedAt: paper.publishedAt || new Date().toISOString().split('T')[0],
       createdAt: new Date(),
       updatedAt: new Date()
     });
 
     await newPaper.save();
     
-    console.log(`✅ 论文保存成功: ${paper.id}`);
+    console.log(`✅ 论文保存成功: ${paperId}`);
 
     res.json({
       success: true,
