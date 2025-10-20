@@ -593,6 +593,23 @@ const Papers = () => {
     setAnalysisError('')
     setAnalysisLogs([])
     
+    // 如果论文来自arXiv在线搜索（ID以arxiv_开头），先保存到数据库
+    if (paper.id && paper.id.startsWith('arxiv_')) {
+      try {
+        console.log('💾 保存在线论文到数据库:', paper.id);
+        const saveResponse = await api.post('/papers/save', { paper });
+        
+        if (saveResponse.data.success) {
+          // 使用数据库返回的论文对象（确保有完整的数据库字段）
+          paper = saveResponse.data.paper;
+          console.log(`✅ 论文已${saveResponse.data.isNew ? '保存' : '存在'}于数据库:`, paper.id);
+        }
+      } catch (error) {
+        console.error('⚠️ 保存论文失败，继续使用临时数据:', error.message);
+        // 保存失败不影响后续的AI解读，继续使用原论文对象
+      }
+    }
+    
     // 检查缓存（除非强制刷新）
     if (!forceRefresh) {
       const cachedResult = getAnalysisFromCache(paper.id, 'standard')

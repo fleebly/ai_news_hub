@@ -171,6 +171,66 @@ router.post('/papers/search', async (req, res) => {
 });
 
 /**
+ * POST /api/papers/save
+ * 保存单篇论文到数据库（用于AI解读前的持久化）
+ */
+router.post('/papers/save', async (req, res) => {
+  try {
+    const { paper } = req.body;
+    
+    if (!paper || !paper.id) {
+      return res.status(400).json({
+        success: false,
+        message: '论文数据不完整'
+      });
+    }
+
+    console.log(`💾 保存论文到数据库: ${paper.title}`);
+
+    // 使用arxivService中的savePapersToDatabase方法
+    const Paper = require('../models/Paper');
+    
+    // 检查论文是否已存在
+    const existingPaper = await Paper.findOne({ id: paper.id });
+    
+    if (existingPaper) {
+      console.log(`📌 论文已存在，返回现有记录: ${paper.id}`);
+      return res.json({
+        success: true,
+        message: '论文已存在',
+        paper: existingPaper,
+        isNew: false
+      });
+    }
+
+    // 保存新论文
+    const newPaper = new Paper({
+      ...paper,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    });
+
+    await newPaper.save();
+    
+    console.log(`✅ 论文保存成功: ${paper.id}`);
+
+    res.json({
+      success: true,
+      message: '论文保存成功',
+      paper: newPaper,
+      isNew: true
+    });
+  } catch (error) {
+    console.error('❌ 保存论文失败:', error.message);
+    res.status(500).json({
+      success: false,
+      message: '保存论文失败',
+      error: process.env.NODE_ENV === 'development' ? error.message : '服务器错误'
+    });
+  }
+});
+
+/**
  * POST /api/papers/refresh
  * 刷新论文缓存并更新数据库
  */
