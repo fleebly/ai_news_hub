@@ -1,0 +1,53 @@
+# Render部署配置文件
+
+services:
+  # 后端API服务
+  - type: web
+    name: ai-news-hub-api
+    env: node
+    region: oregon  # 或 singapore (离中国更近)
+    plan: starter  # 免费层或starter
+    buildCommand: |
+      apt-get update
+      apt-get install -y python3 python3-pip poppler-utils
+      python3 -m pip install pdf2image Pillow requests 'urllib3<2'
+      cd server && npm install --production
+    startCommand: cd server && node index.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5000
+      - key: MONGODB_URI
+        fromDatabase:
+          name: ai-news-hub-mongodb
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: BCRYPT_ROUNDS
+        value: 12
+      # 以下需要在Render控制台手动添加
+      - key: ALIYUN_BAILIAN_API_KEY
+        sync: false
+      - key: ALIYUN_BAILIAN_APP_ID
+        sync: false
+      - key: ALIYUN_BAILIAN_TEXT_MODEL
+        value: qwen3-max
+      - key: ALIYUN_BAILIAN_VISION_MODEL
+        value: qwen-vl-max
+      - key: ALIYUN_OSS_ACCESS_KEY_ID
+        sync: false
+      - key: ALIYUN_OSS_ACCESS_KEY_SECRET
+        sync: false
+      - key: ALIYUN_OSS_REGION
+        value: oss-cn-hangzhou
+      - key: ALIYUN_OSS_BUCKET
+        sync: false
+
+databases:
+  # MongoDB数据库
+  - name: ai-news-hub-mongodb
+    databaseName: ai_news_hub
+    plan: starter  # 免费层
+

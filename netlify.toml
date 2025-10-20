@@ -1,0 +1,77 @@
+# Netlify 配置文件
+# 用于部署前端应用
+
+[build]
+  # 构建命令
+  command = "cd client && npm install && npm run build"
+  
+  # 发布目录
+  publish = "client/dist"
+  
+  # 构建环境
+  [build.environment]
+    NODE_VERSION = "18"
+    NPM_VERSION = "9"
+
+# 路由重定向规则
+[[redirects]]
+  from = "/api/*"
+  to = "https://your-backend-api.com/api/:splat"
+  status = 200
+  force = true
+  headers = {X-From = "Netlify"}
+
+# SPA路由支持
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# 自定义头部
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+# 静态资源缓存
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# 插件配置
+[[plugins]]
+  package = "@netlify/plugin-lighthouse"
+
+# 构建插件
+[[plugins]]
+  package = "netlify-plugin-cache"
+  [plugins.inputs]
+    paths = ["client/node_modules", "client/.vite"]
+
+# 环境变量（在Netlify控制台配置）
+# VITE_API_URL = https://your-backend-api.com/api
+# VITE_APP_TITLE = AI资讯中心
+
+# 分支部署配置
+[context.production]
+  command = "cd client && npm install && npm run build"
+  publish = "client/dist"
+
+[context.deploy-preview]
+  command = "cd client && npm install && npm run build"
+  publish = "client/dist"
+
+[context.branch-deploy]
+  command = "cd client && npm install && npm run build"
+  publish = "client/dist"
+
+# 函数配置（如果需要Netlify Functions）
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
