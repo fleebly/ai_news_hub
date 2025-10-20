@@ -120,7 +120,7 @@ const Papers = () => {
   // AI解读相关状态
   const [showAnalysisModal, setShowAnalysisModal] = useState(false)
   const [selectedPaper, setSelectedPaper] = useState(null)
-  const [interpretationMode, setInterpretationMode] = useState('standard') // 'standard' 或 'enhanced'
+  // 统一使用深度解读模式（包含PDF图表提取 + 多源搜索）
   const [analyzing, setAnalyzing] = useState(false)
   const [analysisResult, setAnalysisResult] = useState(null)
   const [analysisError, setAnalysisError] = useState('')
@@ -607,10 +607,8 @@ const Papers = () => {
       // 使用SSE进行实时进度更新
       const baseURL = api.defaults.baseURL || 'http://localhost:5000/api'
       
-      // 根据模式选择不同的API端点
-      const url = interpretationMode === 'enhanced' 
-        ? `${baseURL}/paper-analysis/analyze-enhanced-stream`
-        : `${baseURL}/paper-analysis/analyze-hybrid-stream`
+      // 使用深度解读模式（PDF图表提取 + 多源搜索）
+      const url = `${baseURL}/paper-analysis/analyze-enhanced-stream`
       
       const response = await fetch(url, {
         method: 'POST',
@@ -680,7 +678,7 @@ const Papers = () => {
                   metadata: data.metadata
                 }
                 setAnalysisResult(result)
-                saveAnalysisToCache(paper.id, interpretationMode, result)
+                saveAnalysisToCache(paper.id, 'enhanced', result)
                 break
               }
               
@@ -703,7 +701,7 @@ const Papers = () => {
               if (data.done) {
                 if (data.success && data.data) {
                   setAnalysisResult(data.data)
-                  saveAnalysisToCache(paper.id, interpretationMode, data.data)
+                  saveAnalysisToCache(paper.id, 'enhanced', data.data)
                 } else if (data.error) {
                   setAnalysisError(data.error || '分析失败')
                 }
@@ -1252,107 +1250,45 @@ const Papers = () => {
             {/* Start Analysis Button */}
             {!analyzing && !analysisResult && (
               <div className="p-4 bg-white border-b">
-                {/* 模式选择 */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    选择解读模式
-                  </label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <button
-                      onClick={() => setInterpretationMode('standard')}
-                      className={`p-4 border-2 rounded-lg transition-all text-left ${
-                        interpretationMode === 'standard'
-                          ? 'border-purple-600 bg-purple-50'
-                          : 'border-gray-200 hover:border-purple-300'
-                      }`}
-                    >
-                      <div className="flex items-center mb-2">
-                        <span className="text-2xl mr-2">📄</span>
-                        <span className="font-semibold text-gray-900">标准解读</span>
-                      </div>
-                      <p className="text-xs text-gray-600 mb-2">
-                        提取PDF图表，生成图文并茂的解读文章
-                      </p>
-                      <div className="flex flex-wrap gap-2 text-xs text-gray-500">
-                        <span>⏱️ 2-4分钟</span>
-                        <span>📊 3000字+</span>
-                        <span>🖼️ 含图表</span>
-                      </div>
-                    </button>
-                    
-                    <button
-                      onClick={() => setInterpretationMode('enhanced')}
-                      className={`p-4 border-2 rounded-lg transition-all text-left ${
-                        interpretationMode === 'enhanced'
-                          ? 'border-purple-600 bg-purple-50'
-                          : 'border-gray-200 hover:border-purple-300'
-                      }`}
-                    >
-                      <div className="flex items-center mb-2">
-                        <span className="text-2xl mr-2">🌐</span>
-                        <span className="font-semibold text-gray-900">深度解读</span>
-                        <span className="ml-2 px-2 py-0.5 bg-gradient-to-r from-purple-600 to-blue-600 text-white text-xs rounded-full">NEW</span>
-                      </div>
-                      <p className="text-xs text-gray-600 mb-2">
-                        联网搜索相关资料，引经据典，博采众长
-                      </p>
-                      <div className="flex flex-wrap gap-2 text-xs text-gray-500">
-                        <span>⏱️ 3-5分钟</span>
-                        <span>📚 arXiv/知乎/博客</span>
-                        <span>🔗 含引用</span>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-
-                {/* 模式说明 */}
-                <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-4 mb-4">
+                {/* 深度解读说明 */}
+                <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-6 mb-4">
                   <div className="text-center">
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">
-                      {interpretationMode === 'enhanced' ? '🌐 深度解读' : '📄 标准解读'}
+                    <div className="text-4xl mb-3">🌐</div>
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">
+                      AI深度解读
                     </h3>
-                    <p className="text-gray-600 text-sm mb-3">
-                      {interpretationMode === 'enhanced' 
-                        ? '提取核心Topic，联网搜索arXiv、OpenReview、知乎、技术博客等，引经据典，知其然和所以然'
-                        : '采用先进的视觉AI技术，自动提取论文图表，生成图文并茂的专业解读文章'
-                      }
+                    <p className="text-gray-600 text-sm mb-4 leading-relaxed">
+                      提取PDF图表 + 多源搜索（arXiv/OpenReview/知乎/博客）<br/>
+                      引经据典，博采众长，知其然和所以然
                     </p>
-                    <div className="flex justify-center flex-wrap gap-4 text-xs text-gray-700">
-                      {interpretationMode === 'enhanced' ? (
-                        <>
-                          <div className="flex items-center">
-                            <span className="mr-1">🔍</span>
-                            <span>提取核心Topic</span>
-                          </div>
-                          <div className="flex items-center">
-                            <span className="mr-1">📚</span>
-                            <span>多源检索</span>
-                          </div>
-                          <div className="flex items-center">
-                            <span className="mr-1">🔗</span>
-                            <span>引经据典</span>
-                          </div>
-                          <div className="flex items-center">
-                            <span className="mr-1">💡</span>
-                            <span>举一反三</span>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="flex items-center">
-                            <span className="mr-1">📄</span>
-                            <span>PDF图片提取</span>
-                          </div>
-                          <div className="flex items-center">
-                            <span className="mr-1">🖼️</span>
-                            <span>关键图表识别</span>
-                          </div>
-                          <div className="flex items-center">
-                            <span className="mr-1">📝</span>
-                            <span>深度技术解析</span>
-                          </div>
-                        </>
-                      )}
+                    <div className="flex justify-center flex-wrap gap-3 text-xs text-gray-700">
+                      <div className="flex items-center px-3 py-1.5 bg-white rounded-full shadow-sm">
+                        <span className="mr-1.5">📄</span>
+                        <span>PDF图表提取</span>
+                      </div>
+                      <div className="flex items-center px-3 py-1.5 bg-white rounded-full shadow-sm">
+                        <span className="mr-1.5">🔍</span>
+                        <span>核心Topic</span>
+                      </div>
+                      <div className="flex items-center px-3 py-1.5 bg-white rounded-full shadow-sm">
+                        <span className="mr-1.5">📚</span>
+                        <span>多源检索</span>
+                      </div>
+                      <div className="flex items-center px-3 py-1.5 bg-white rounded-full shadow-sm">
+                        <span className="mr-1.5">🔗</span>
+                        <span>引经据典</span>
+                      </div>
+                      <div className="flex items-center px-3 py-1.5 bg-white rounded-full shadow-sm">
+                        <span className="mr-1.5">💡</span>
+                        <span>举一反三</span>
+                      </div>
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-purple-200">
+                      <div className="flex justify-center gap-6 text-xs text-gray-600">
+                        <span>⏱️ 预计4-6分钟</span>
+                        <span>📊 5000字+</span>
+                        <span>🖼️ 图文并茂</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1362,17 +1298,17 @@ const Papers = () => {
                   <button
                     onClick={() => handleAnalyze(selectedPaper)}
                     disabled={analyzing}
-                    className="w-full flex items-center justify-center px-6 py-3 text-base font-medium text-white bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 rounded-lg transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full flex items-center justify-center px-6 py-4 text-lg font-medium text-white bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 rounded-lg transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {analyzing ? (
                       <>
-                        <Loader className="h-5 w-5 mr-2 animate-spin" />
+                        <Loader className="h-6 w-6 mr-2 animate-spin" />
                         分析中...
                       </>
                     ) : (
                       <>
-                        <Sparkles className="h-5 w-5 mr-2" />
-                        开始{interpretationMode === 'enhanced' ? '深度' : 'AI'}解读
+                        <Sparkles className="h-6 w-6 mr-2" />
+                        开始深度解读
                       </>
                     )}
                   </button>
