@@ -1300,8 +1300,8 @@ const Papers = () => {
                     </div>
                     <div className="mt-4 pt-4 border-t border-purple-200">
                       <div className="flex justify-center gap-6 text-xs text-gray-600">
-                        <span>⏱️ 预计4-6分钟</span>
-                        <span>📊 5000字+</span>
+                        <span>⏱️ 预计6-10分钟</span>
+                        <span>📊 10000字+</span>
                         <span>🖼️ 图文并茂</span>
                       </div>
                     </div>

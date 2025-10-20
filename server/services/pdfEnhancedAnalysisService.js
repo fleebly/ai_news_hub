@@ -267,7 +267,7 @@ class PDFEnhancedAnalysisService {
 
     try {
       // 使用 chat 方法，传递正确的消息格式
-      sendProgress(70, '🤖 AI正在生成深度长文（5000字+，预计2-5分钟）...', { stage: 'generate' });
+      sendProgress(70, '🤖 AI正在生成深度长文（10000字+，预计5-8分钟）...', { stage: 'generate' });
       
       const messages = [
         { role: 'user', content: prompt }
@@ -282,11 +282,11 @@ class PDFEnhancedAnalysisService {
         aliyunBailianService.chat(messages, {
           model: this.textModel,
           temperature: 0.7,
-          maxTokens: 20000  // 提升到20000，支持更长的深度解读（5000字+）
+          maxTokens: 30000  // 提升到30000，支持更长的深度解读（10000字+）
         }),
-        // 15分钟超时保护（延长以支持更长内容生成）
+        // 20分钟超时保护（延长以支持更长内容生成）
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('AI生成超时（15分钟）')), 900000)
+          setTimeout(() => reject(new Error('AI生成超时（20分钟）')), 1200000)
         )
       ]);
 
@@ -337,7 +337,7 @@ class PDFEnhancedAnalysisService {
       
       // 提供更友好的错误信息
       if (error.message.includes('超时')) {
-        throw new Error('AI生成超时（15分钟），论文过于复杂或资料过多。建议稍后重试或使用标准解读模式。');
+        throw new Error('AI生成超时（20分钟），论文过于复杂或资料过多。建议稍后重试。');
       }
       
       throw error;
@@ -505,10 +505,12 @@ ${blogSection || '暂无'}
 2. 公式使用LaTeX语法，行内公式用 $...$ ，独立公式用 $$...$$
 3. 引用使用 [数字] 格式
 4. 保持专业但易懂的风格
-5. **总字数不少于5000字**，可根据论文复杂度和内容深度自由扩展，追求质量而非字数限制
-6. 对于复杂论文，鼓励深入展开分析，充分利用所有检索到的参考资料
+5. **总字数不少于10000字（1万字）**，深度论文应达到15000字以上，追求深度和广度的完美结合
+6. 对于复杂论文，必须深入展开分析，充分利用所有检索到的参考资料，做到引经据典
 7. **重要**：如果论文关键图表中提供了图片URL，请在文章的适当位置使用Markdown图片语法 ![描述](URL) 来嵌入这些图片
-8. 图片应该放在相关技术讲解的段落之后，帮助读者更好地理解内容`;
+8. 图片应该放在相关技术讲解的段落之后，帮助读者更好地理解内容
+9. 每个章节都要充分展开，不要简略带过，要做到知其然和所以然
+10. 引用的参考文献要详细说明其与当前论文的关系，不只是列出标题`;
 
     return prompt;
   }
