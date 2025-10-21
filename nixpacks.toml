@@ -1,17 +1,14 @@
 # Railway Nixpacks配置
-# 用于配置Python环境和依赖
+# 简化版本 - 仅 Node.js，暂时禁用 Python（PDF功能）
 
 [phases.setup]
-nixPkgs = ["nodejs-18_x", "python39", "python39Packages.pip", "poppler_utils"]
+nixPkgs = ["nodejs-18_x"]
 
 [phases.install]
-cmds = [
-  "cd server && npm install --production",
-  "python3 -m pip install --user pdf2image Pillow requests 'urllib3<2'"
-]
+cmds = ["cd server && npm install --production"]
 
 [phases.build]
-cmds = ["echo 'Build phase complete'"]
+cmds = ["echo 'Build complete'"]
 
 [start]
 cmd = "cd server && node index.js"
