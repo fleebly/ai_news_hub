@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "AI编程教练后端服务（使用SQLite）",
   "main": "index.js",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "dev": "nodemon index.js",
     "start": "node index.js"
