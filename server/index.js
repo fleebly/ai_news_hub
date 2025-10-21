@@ -81,14 +81,28 @@ app.use('*', (req, res) => {
 // 连接数据库并启动服务器
 const startServer = async () => {
   try {
-    await connectDB();
+    // 尝试连接数据库，如果失败则警告但继续启动
+    try {
+      await connectDB();
+      console.log('✅ 数据库连接成功');
+    } catch (dbError) {
+      console.warn('⚠️  数据库连接失败，某些功能可能不可用:', dbError.message);
+      console.warn('⚠️  服务器将继续启动...');
+    }
     
-    app.listen(PORT, () => {
+    // 监听所有网络接口 (0.0.0.0)
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 AI编程教练服务器运行在端口 ${PORT}`);
       console.log(`📚 环境: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`🌐 监听地址: 0.0.0.0:${PORT}`);
       
       // 启动定时任务服务
-      schedulerService.start();
+      try {
+        schedulerService.start();
+        console.log('✅ 定时任务服务已启动');
+      } catch (schedError) {
+        console.warn('⚠️  定时任务启动失败:', schedError.message);
+      }
     });
   } catch (error) {
     console.error('❌ 服务器启动失败:', error);
