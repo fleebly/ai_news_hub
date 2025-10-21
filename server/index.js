@@ -23,6 +23,9 @@ const schedulerService = require('./services/schedulerService');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// 信任反向代理（Railway/Nginx 等）
+app.set('trust proxy', 1);
+
 // 安全中间件
 app.use(helmet());
 
